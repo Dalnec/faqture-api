@@ -1,4 +1,4 @@
-from base.db import __conectarse
+from base.comercial.db import __conectarse
 
 class Guia:    
     id_guia = None

@@ -1,5 +1,5 @@
 import time
-from base.db import __conectarse
+from base.comercial.db import __conectarse
 import configparser
 
 config = configparser.ConfigParser()
@@ -54,7 +54,7 @@ class DetalleVenta:
         return self.nombre_producto
 
 
-def leer_db_rechazados():
+def leer_db_access():
     cnx = __conectarse()
     cursor = cnx.cursor()
     lista_ventas = []
@@ -86,21 +86,17 @@ def leer_db_rechazados():
             INNER JOIN comercial.detalle_venta DV ON V.id_venta = DV.id_venta
             INNER JOIN comercial.producto P ON P.codigo_producto = DV.codigo_producto
             INNER JOIN comercial.detalle_producto DP ON P.codigo_producto = DP.codigo_producto
-            --INNER JOIN comercial.unidadmedida U ON  U.codigo_unidad_m = DV.cod_unidad_medida 
             INNER JOIN comercial.metodo_pago MP ON  MP.id_metodo_pago = V.id_metodo_pago
-        WHERE V.estado_declaracion='ANULADO'
-		AND V.estado_declaracion_anulado='PENDIENTE'
-            AND observaciones_declaracion = ''
-            AND external_id = ''
-            AND V.num_serie not in ('PRE') 
-            AND TD.id_tipodocumento in (25,26)
+        WHERE V.estado_declaracion in ('PENDIENTE', 'ANULADO')
+			AND V.estado_declaracion_anulado <> 'PROCESADO'
+            AND V.num_serie not in ('PRE')  
+            AND TD.codigo_sunat in ('01','03')
             AND V.fecha_hora >= '{}'
-            AND V.codigo_cliente = 'ANULADO'  -- cambia con respecto al envio de documentos
         ORDER BY V.fecha_hora 
         """
     #(1,2) (25,26)
     sql_detail = """
-        SELECT distinct 
+        SELECT
             P.codigo_producto codigo,--0
             DV.descripcion,		--1
             DV.cantidad,		--2
@@ -116,7 +112,6 @@ def leer_db_rechazados():
         FROM
             comercial.detalle_venta DV
             INNER JOIN comercial.producto P ON P.codigo_producto = DV.codigo_producto
-            INNER JOIN comercial.detalle_producto DP ON P.codigo_producto = DP.codigo_producto
             INNER JOIN comercial.ventas V ON V.id_venta = DV.id_venta
         WHERE
             V.id_venta = {}
@@ -331,5 +326,5 @@ def _datos_adicionales(numero_placa):
     datos['codigo'] = "5010"
     datos['descripcion'] = "Numero de Placa"
     datos['valor'] = numero_placa
-    
-    return datos_adicionales.append(datos)
+    datos_adicionales.append(datos)
+    return datos_adicionales
