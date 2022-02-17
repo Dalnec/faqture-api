@@ -5,13 +5,14 @@ import configparser
 import time
 import shutil
 import os
-from backup.send_drive import searchFile
+from base.backup.send_drive import searchFile
 from logger import log
 
 config = configparser.ConfigParser()
 config.read('config.ini')
 
 db_name = config['BASE']['DB_NAME']
+db_user = config['BASE']['DB_USER']
 db_port = config['BASE']['DB_PORT']
 bu_name = config['BACKUP']['BU_NAME']
 db_drive = eval(config['BACKUP']['BU_DRIVE'])
@@ -34,7 +35,7 @@ def backup():
 
 def _create_file():
     log.info('Backup...')
-    cmd ='pg_dump -d '+ db_name +' -p '+ db_port +' -U comercial -F t -f '+ file_name
+    cmd = f'pg_dump -d {db_name} -p {db_port} -U {db_user} -F t -f {file_name}'
     with gzip.open(file_name, 'wb') as f:
         popen = subprocess.Popen(cmd, stdout=subprocess.PIPE, universal_newlines=True)    
     for stdout_line in iter(popen.stdout.readline, ""):

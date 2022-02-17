@@ -2,13 +2,12 @@
 
 block_cipher = None
 added_files = [( 'models/*.*', 'kulami' ),
-         ( 'base/db.py', 'base' ),
-         ( 'pseapi/api.py', 'pseapi' ),
-         ( 'backup/*.*', 'backup' )         
+         ( 'base/*.*', 'base' ),
+         ( 'api/*.*', 'pseapi' )         
          ]
 
 a = Analysis(['main.py'],
-             pathex=['D:\\TSI\\Faqture_Code\\kenaani_read_db'],
+             pathex=['D:\\TSI\\Faqture_Code\\faqture-api'],
              binaries=[],
              datas=added_files,
              hiddenimports=['google-api-python-client'],
@@ -34,4 +33,5 @@ exe = EXE(pyz,
           upx=True,
           upx_exclude=[],
           runtime_tmpdir=None,
-          console=True , icon='api.ico')
+          console=True, 
+          icon='')

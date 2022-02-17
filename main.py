@@ -80,14 +80,15 @@ if __name__ == "__main__":
                 log.error(f'Guia de Remision: {e}')
                 time.sleep(2)
 
-            # time_now = _get_time()
-            # if  time_now >= db_time and time_now <= db_time2 and db_state:
-            #     try:
-            #         backup()
-            #         time.sleep(1)
-            #     except Exception as e:
-            #         log.error(f'Backups: {e}') 
-            #         time.sleep(1)
+            time_now = time.localtime()
+            time_now = time.strftime("%H:%M:%S", time_now)
+            if  time_now >= db_time and time_now <= db_time2 and db_state:
+                try:
+                    backup()
+                    time.sleep(1)
+                except Exception as e:
+                    log.error(f'Backups: {e}') 
+                    time.sleep(1)
     
     if tipo == 'gulash':
         
@@ -110,5 +111,14 @@ if __name__ == "__main__":
             except Exception as e:
                 log.error(f'Anulados Facturas: {e}')
                 time.sleep(2)
-                
-# (132086, 132095, 132099, 132100, 132103, 132106)
+            
+            time_now = time.localtime()
+            time_now = time.strftime("%H:%M:%S", time_now)
+            # time_now = _get_time()
+            if  time_now >= db_time and time_now <= db_time2 and db_state:
+                try:
+                    backup()
+                    time.sleep(1)
+                except Exception as e:
+                    log.error(f'Backups: {e}') 
+                    time.sleep(1)

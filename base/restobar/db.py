@@ -56,7 +56,7 @@ def r_update_anulados_pgsql(estado, estado_anulado, ext_id, id):
         cnx = __conectarse()
         cursor = cnx.cursor()
         cursor.execute(
-            "UPDATE gulash.ventas SET estado_declaracion=%s, estado_declaracion_anulado=%s, observaciones_declaracion=%s, WHERE id_venta = %s", (estado, estado_anulado, ext_id, id))
+            "UPDATE gulash.ventas SET estado_declaracion=%s, estado_declaracion_anulado=%s, observaciones_declaracion=%s WHERE id_venta = %s", (estado, estado_anulado, ext_id, id))
         cnx.commit()
     finally:
         # closing database connection

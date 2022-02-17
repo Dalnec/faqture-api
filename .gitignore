@@ -149,3 +149,4 @@ prueba.json
 logs.log
 format.json
 format1.json
+*.exe
