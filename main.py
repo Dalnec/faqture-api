@@ -67,7 +67,7 @@ if __name__ == "__main__":
             if state_ncredi:  
                 try:                
                     lista_notaCredito = leer_db_notaCredito()
-                    ApiClient(tipo).create_notaCredito(lista_notaCredito)
+                    ApiClient(tipo)._send_cpe_notaCredito(lista_notaCredito)
                 except Exception as e:
                     log.error(f'Notas Creditos: {e}')
                     time.sleep(2)
@@ -89,7 +89,7 @@ if __name__ == "__main__":
                 except Exception as e:
                     log.error(f'Backups: {e}') 
                     time.sleep(1)
-    
+
     if tipo == 'gulash':
         
         while True:

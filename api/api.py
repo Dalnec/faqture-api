@@ -31,9 +31,9 @@ class ApiClient:
             try:
                 # print(venta)
                 # print(ObjJSON(venta).encoder())
-                json_venta = { "document": ObjJSON(venta).encoder()}
+                # json_venta = { "document": ObjJSON(venta).encoder()}
                 # Realizamos la llamada al API de envío de documentos
-                res = requests.post(self.url, json=json_venta, headers=self.headers, verify=False)
+                res = requests.post(self.url, json=venta, headers=self.headers, verify=False)
                 # Obtenemos la respuesta y lo decodificamos
                 data = ObjJSON(res.content.decode("UTF8")).decoder()                
                 # Adaptamos la respuesta para guardarlo
@@ -87,7 +87,7 @@ class ApiClient:
                     else:
                         update_anulados_pgsql('ANULADO', 'PROCESADO', ObjJSON(rest.data).encoder(), int(venta.id_venta))
                     log.info(f'{rest.message}')
-                else: #que hacer um comprobate no existe y quiere ser anulado => update to sent
+                else: 
                     rest = RespuestaREST(False, data['message'], data)
                     if (rest.message.find('Document not found!') != -1):
                         if tipo:
@@ -125,15 +125,14 @@ class ApiClient:
                 data = ObjJSON(res.content.decode("UTF8")).decoder()
                 # Adaptamos la respuesta para guardarlo
                 if res.status_code == 200:
-                    external_id=data['data']['external_id']
-                    update_notaCredito_pgsql(external_id, int(venta['id_venta']))
-                    rest = RespuestaREST(
-                        data['success'],"filename:{};estado:{}".format(data['data']['filename'],
+                    rest = RespuestaREST( data['success'],"filename:{};estado:{}".format(data['data']['filename'],
                         data['data']['state_type_description']), data)
+                    update_notaCredito_pgsql(ObjJSON(rest.data).encoder(), int(venta['id_venta']))
                     log.info(f'{rest.message}')
                 else:
                     rest = RespuestaREST(False, data['message'], data)
-                    log.error(f'{rest.message}')
+                    update_notaCredito_pgsql(ObjJSON(rest.data).encoder(), int(venta['id_venta']))
+                    log.error(f'{venta["id_venta"]} {venta["serie_documento"]}-{venta["numero_documento"]}|{rest.message}')
                         
             except requests.ConnectionError as e:
                 log.warning(e)

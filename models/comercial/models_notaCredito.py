@@ -128,18 +128,18 @@ def _generate_lista(ventas):
         header_dic['codigo_tipo_moneda'] = codigo_tipo_moneda
         header_dic['numero_orden_de_compra'] = ''
         
-        if venta.external_id:            
-            # Con external_id
-            documento_afectado = {}
-            documento_afectado['external_id'] = venta.external_id
-            header_dic['documento_afectado'] = documento_afectado
-        else:        
-            # Sin external_id
-            documento_afectado = {}
-            documento_afectado['serie_documento'] = venta.serie_venta
-            documento_afectado['numero_documento'] = venta.numero_venta
-            documento_afectado['codigo_tipo_documento'] = venta.codigo_tipo_documento
-            header_dic['documento_afectado'] = documento_afectado
+        # if venta.external_id:            
+        #     # Con external_id
+        #     documento_afectado = {}
+        #     documento_afectado['external_id'] = venta.external_id
+        #     header_dic['documento_afectado'] = documento_afectado
+        # else:        
+        # Sin external_id
+        documento_afectado = {}
+        documento_afectado['serie_documento'] = venta.serie_venta
+        documento_afectado['numero_documento'] = int(venta.numero_venta)
+        documento_afectado['codigo_tipo_documento'] = venta.codigo_tipo_documento
+        header_dic['documento_afectado'] = documento_afectado
         
         # totales
         datos_totales = {}

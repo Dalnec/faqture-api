@@ -139,8 +139,7 @@ Carina.backup
 Carina.backup.gz
 token.pickle
 base/backup/credenciales/
-apiazul.ico
-apirojo.ico
+logo.ico
 api.ico
 credentials_Dany.json
 requirements1.txt
