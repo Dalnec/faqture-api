@@ -54,7 +54,7 @@ class DetalleVenta:
         return self.nombre_producto
 
 
-def leer_db_access():
+def leer_db():
     cnx = __conectarse()
     cursor = cnx.cursor()
     lista_ventas = []
@@ -82,10 +82,10 @@ def leer_db_access():
             INNER JOIN comercial.tipodocumento TD ON TD.id_tipodocumento = V.id_tipodocumento
             INNER JOIN comercial.cliente C ON C.codigo_cliente = V.codigo_cliente_anulado
             INNER JOIN comercial.direcciones D ON D.id_direcciones = V.id_direcciones
-            INNER JOIN comercial.moneda M ON M.id_moneda = V.id_moneda
-            INNER JOIN comercial.detalle_venta DV ON V.id_venta = DV.id_venta
-            INNER JOIN comercial.producto P ON P.codigo_producto = DV.codigo_producto
-            INNER JOIN comercial.detalle_producto DP ON P.codigo_producto = DP.codigo_producto
+            --INNER JOIN comercial.moneda M ON M.id_moneda = V.id_moneda
+            --INNER JOIN comercial.detalle_venta DV ON V.id_venta = DV.id_venta
+            --INNER JOIN comercial.producto P ON P.codigo_producto = DV.codigo_producto
+            --INNER JOIN comercial.detalle_producto DP ON P.codigo_producto = DP.codigo_producto
             INNER JOIN comercial.metodo_pago MP ON  MP.id_metodo_pago = V.id_metodo_pago
         WHERE V.estado_declaracion in ('PENDIENTE', 'ANULADO')
 			AND V.estado_declaracion_anulado <> 'PROCESADO'

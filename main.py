@@ -2,6 +2,7 @@ import time
 import sys
 import configparser
 
+
 config = configparser.ConfigParser()
 config.read('config.ini')
 tipo = config['BASE']['DB_USER']
@@ -21,7 +22,8 @@ if __name__ == "__main__":
     sys.path.append('api')
     sys.path.append('backup')
 
-    from models.comercial.models import leer_db_access
+    from models.comercial.models import leer_db
+    from models.comercial.models_notaventa import leer_db_notas
     from models.comercial.models_anulate import leer_db_anulados
     from models.comercial.models_notaCredito import leer_db_notaCredito
     from models.comercial.models_guiaRemision import leer_db_guia
@@ -38,7 +40,7 @@ if __name__ == "__main__":
         while True:
             try:
                 if state_doc:            
-                    lista_ventas = leer_db_access()
+                    lista_ventas = leer_db()
                     ApiClient(tipo)._send_cpe(lista_ventas)
                     time.sleep(1)  
             except Exception as e:
@@ -55,14 +57,14 @@ if __name__ == "__main__":
                 log.error(f'Anulados Facturas: {e}')
                 time.sleep(2)
 
-            # try:
-            #     if state_nventas:                
-            #         formato, lista_resumen = leer_db_resumen()
-            #         create_resumen(formato, lista_resumen)
-            #         time.sleep(1)
-            # except Exception as e:
-            #     log.error(f'Notas Ventas: {e}')
-            #     time.sleep(2)
+            try:
+                if state_nventas:                
+                    lista_notas = leer_db_notas()
+                    ApiClient(tipo)._send_cpe(lista_notas)
+                    time.sleep(1)
+            except Exception as e:
+                log.error(f'Notas Ventas: {e}')
+                time.sleep(2)
             
             if state_ncredi:  
                 try:                
