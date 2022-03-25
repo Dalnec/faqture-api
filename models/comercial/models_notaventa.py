@@ -87,7 +87,7 @@ def leer_db_notas():
             AND V.num_serie not in ('PRE')  
             AND TD.codigo_sunat = '80'
             AND V.fecha_hora >= '{}'
-        ORDER BY V.fecha_hora desc LIMIT 50
+        ORDER BY V.fecha_hora
         """
     #(1,2) (25,26)
     sql_detail = """

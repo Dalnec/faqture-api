@@ -27,8 +27,9 @@ if __name__ == "__main__":
     from models.comercial.models_anulate import leer_db_anulados
     from models.comercial.models_notaCredito import leer_db_notaCredito
     from models.comercial.models_guiaRemision import leer_db_guia
-    from models.restobar.models import r_leer_db_access
+    from models.restobar.models import r_leer_db
     from models.restobar.models_anulate import r_leer_db_anulados
+    from models.restobar.models_notaventa import r_leer_db_notas
     # from base.comercial.db import read_empresa_pgsql
     # from base.restobar.db import r_read_empresa_pgsql
     from api.api import ApiClient
@@ -97,7 +98,7 @@ if __name__ == "__main__":
         while True:
             try:
                 if state_doc:            
-                    lista_ventas = r_leer_db_access()
+                    lista_ventas = r_leer_db()
                     ApiClient(tipo)._send_cpe(lista_ventas, tipo)
                     time.sleep(1)  
             except Exception as e:
@@ -114,9 +115,19 @@ if __name__ == "__main__":
                 log.error(f'Anulados Facturas: {e}')
                 time.sleep(2)
             
+
+            try:
+                if state_nventas:                
+                    lista_notas = r_leer_db_notas()
+                    ApiClient(tipo)._send_cpe(lista_notas, tipo)
+                    time.sleep(1)
+            except Exception as e:
+                log.error(f'Notas Ventas: {e}')
+                time.sleep(2)
+            
+            
             time_now = time.localtime()
             time_now = time.strftime("%H:%M:%S", time_now)
-            # time_now = _get_time()
             if  time_now >= db_time and time_now <= db_time2 and db_state:
                 try:
                     backup()

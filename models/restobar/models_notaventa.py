@@ -48,7 +48,7 @@ class DetalleVenta:
         return self.nombre_producto
 
 
-def r_leer_db():
+def r_leer_db_notas():
     cnx = __conectarse()
     cursor = cnx.cursor()
     lista_ventas = []
@@ -94,12 +94,11 @@ def r_leer_db():
                 
             WHERE   
                 documento.estado='A' AND 
-                documento.electronico='S' AND
+                documento.electronico='N' AND
                 ventas.estado in ('A', 'I') AND
-                ventas.estado_declaracion = 'PENDIENTE' AND
+                ventas.estado_declaracion = 'NO DECLARAR' AND
                 ventas.estado_declaracion_anulado = '' AND
                 ventas.fecha_hora >= '{}'
-                --ventas.fecha_hora = '2020-08-19 17:03:00'
             ORDER BY id_venta
         """
 
