@@ -125,8 +125,7 @@ class ApiClient:
                 data = ObjJSON(res.content.decode("UTF8")).decoder()
                 # Adaptamos la respuesta para guardarlo
                 if res.status_code == 200:
-                    rest = RespuestaREST( data['success'],"filename:{};estado:{}".format(data['data']['filename'],
-                        data['data']['state_type_description']), data)
+                    rest = RespuestaREST( data['success'],"{};filename:{};estado:{}".format(data['data']['cod_sale'],data['data']['filename'], data['data']['state']), data)
                     update_notaCredito_pgsql(ObjJSON(rest.data).encoder(), int(venta['id_venta']))
                     log.info(f'{rest.message}')
                 else:

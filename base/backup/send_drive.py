@@ -27,7 +27,7 @@ def getCredentials():
         with open('token.pickle', 'wb') as token:
             pickle.dump(creds, token)
 
-    service = build('drive', 'v3', credentials=creds, cache_discovery=False)
+    service = build('drive', 'v3', credentials=creds, cache_discovery=False, static_discovery=False)
     return service
 
 def list_items():
