@@ -262,8 +262,8 @@ def _generate_lista(ventas):
                 item['precio_unitario'] = deta.precio_producto - (deta.desc_individual/round(deta.cantidad, 2))
                 desc = []
                 descuentos = {}
-                descuentos['codigo'] = '00'
-                descuentos['descripcion'] = "Descuento Lineal"
+                descuentos['codigo'] = '01'
+                descuentos['descripcion'] = "Descuentos que no afectan la base imponible del IGV/IVAP"
                 descuentos['factor'] = deta.desc_porcentaje / 100
                 descuentos['monto'] = deta.desc_individual
                 descuentos['base'] = deta.sub_total
