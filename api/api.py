@@ -1,8 +1,8 @@
 import requests
 import json
 
-from base.comercial.db import (read_empresa_pgsql, update_no_200, update_venta_pgsql, update_anulados_pgsql, update_notaCredito_pgsql, update_guia_pgsql)
-from base.restobar.db import (r_read_empresa_pgsql, r_update_no_200, r_update_venta_pgsql, r_update_anulados_pgsql)
+from base.comercial.db import (read_empresa_pgsql, update_no_200, update_venta_pgsql, update_anulados_pgsql, update_notaCredito_pgsql, update_guia_pgsql, update_venta_pgsql_external_id)
+from base.restobar.db import (r_read_empresa_pgsql, r_update_no_200, r_update_venta_pgsql, r_update_anulados_pgsql, r_update_venta_pgsql_external_id)
 from logger import log
 from urllib3.exceptions import InsecureRequestWarning
 
@@ -23,15 +23,8 @@ class ApiClient:
     def _send_cpe(self, ventas, tipo=None):
         
         for venta in ventas:
-            # print(venta)
-            # f = open(f"format_{venta['id_venta']}.json", "a")
-            # f.write(json.dumps(venta))
-            # f.close()
             # Manejamos las excepciones
             try:
-                # print(venta)
-                # print(ObjJSON(venta).encoder())
-                # json_venta = { "document": ObjJSON(venta).encoder()}
                 # Realizamos la llamada al API de envío de documentos
                 res = requests.post(self.url, json=venta, headers=self.headers, verify=False)
                 # Obtenemos la respuesta y lo decodificamos
@@ -40,9 +33,9 @@ class ApiClient:
                 if res.status_code == 200:
                     rest = RespuestaREST( data['success'],"{};filename:{};estado:{}".format(data['data']['cod_sale'],data['data']['filename'], data['data']['state']), data)
                     if tipo:          
-                        r_update_venta_pgsql('PROCESADO', rest.message, int(venta['id_venta']))
+                        r_update_venta_pgsql_external_id('PROCESADO', rest.message, rest.data['data']['external_id'], int(venta['id_venta']))
                     else:
-                        update_venta_pgsql('PROCESADO', rest.message, int(venta['id_venta']))
+                        update_venta_pgsql_external_id('PROCESADO', rest.message, rest.data['data']['external_id'], int(venta['id_venta']))
                     
                     log.info(f'{rest.message}')
                 else:

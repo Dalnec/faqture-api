@@ -249,7 +249,7 @@ def _generate_lista(ventas):
             item['descripcion'] = deta.nombre_producto
             item['codigo_producto_sunat'] = ''
             item['unidad_de_medida'] = 'NIU'
-            item['cantidad'] = round(deta.cantidad, 2)
+            item['cantidad'] = deta.cantidad #round(deta.cantidad, 2)
             item['codigo_tipo_precio'] = '01'
             item['precio_unitario'] = deta.precio_producto
             

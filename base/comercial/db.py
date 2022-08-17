@@ -32,6 +32,18 @@ def update_venta_pgsql(estado, obs, id):
             cursor.close()
             cnx.close()
 
+def update_venta_pgsql_external_id(estado, obs, external_id, id):
+    try:
+        cnx = __conectarse()
+        cursor = cnx.cursor()
+        cursor.execute( "UPDATE comercial.ventas SET estado_declaracion = %s, observaciones_declaracion = %s, external_id=%s WHERE id_venta = %s", (estado, obs, external_id, id))
+        cnx.commit() #Guarda los cambios en la bd
+    finally:
+        # closing database connection
+        if (cnx):
+            cursor.close()
+            cnx.close()
+
 def read_empresa_pgsql():
     try:
         cnx = __conectarse()
