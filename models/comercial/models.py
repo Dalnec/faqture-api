@@ -47,7 +47,7 @@ class DetalleVenta:
         self.sub_total = float(sub_total)
         self.monto_total = float(monto_total)
         self.igv = float(igv)
-        self.igv_descuento = float(igv_descuento)
+        self.igv_descuento = float(igv_descuento) if igv_descuento else 0.0
         self.descuento_total = float(descuento_total)
 
     def __str__(self):
