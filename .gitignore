@@ -149,3 +149,4 @@ logs.log
 format.json
 format1.json
 *.exe
+requirements_backup.txt
