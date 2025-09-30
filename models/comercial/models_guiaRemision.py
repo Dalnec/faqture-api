@@ -28,6 +28,13 @@ class Guia:
     placa_vehiculo = None
     cod_empleado = None
     punto_venta = None
+    dni_chofer = None
+    chofer = None
+    tipo_transporte = None
+    peso = None
+    codigo_motivo_traslado = None
+    descripcion_motivo_traslado = None
+    observaciones = None
     
     detalle_guias = []
 
@@ -53,16 +60,25 @@ def leer_db_guia():
     lista_guias = []
 
     sql_header = """
-    SELECT G.id_guia, 
-        split_part(G.num_documento::TEXT,'-', 1) serie,
-        split_part(G.num_documento::TEXT,'-', 2) num,
+    SELECT 
+        G.id_guia, 
+        G.num_serie, -- split_part(G.num_documento::TEXT,'-', 1) AS serie,
+        G.num_documento, -- split_part(G.num_documento::TEXT,'-', 2) AS num,
         G.fecha_hora,
-        TD.codigo_sunat,  
+        TD.codigo_sunat, 
         'UBIGEOEmisor' AS UBIGEO,
         E.direccion, 
         E.telefono,
-        case when G.ruccliente !='' then '6' when G.dni_cliente !='' then '1'  else '0' end cliente_tipo_de_documento,         
-        case when G.dni_cliente !='' then G.dni_cliente when G.ruccliente !='' then G.ruccliente else '00000000' end cliente_numero_de_documento,
+        CASE 
+            WHEN G.ruccliente <> '' THEN '6' 
+            WHEN G.dni_cliente <> '' THEN '1'  
+            ELSE '0' 
+        END AS cliente_tipo_de_documento,         
+        CASE 
+            WHEN G.dni_cliente <> '' THEN G.dni_cliente 
+            WHEN G.ruccliente <> '' THEN G.ruccliente 
+            ELSE '00000000' 
+        END AS cliente_numero_de_documento,
         G.nombre_representante,
         'UbigeoCliente' AS ubigeoCliente,
         G.direccionllegada,
@@ -70,22 +86,32 @@ def leer_db_guia():
         case when C.telefono !='' and C.celular !='' then C.telefono || ' - ' || C.celular when C.telefono !='' then C.telefono when C.celular !='' then C.celular  else '' end telefono_cliente,
         G.fecha_traslado,
         G.num_bultos,
-        'UbigeoPartida' as ubigeoPartida,
+        G.ubigeo_partida,
         G.direccionpartida,
-        'UbigeoLLegada' as ubigeoLLegada,
+        G.ubigeo_llegada,
         G.ructrasnporte,
         G.transporte,
         G.licencia,
         G.placa,
         G.cod_empleado,
-        G.id_puntodeventa
+        G.id_puntodeventa,
+        G.dni_chofer,
+        G.chofer,
+        G.tipo_transporte,
+        G.peso,
+        TG.codigo,
+        TG.descripcion,
+        G.descripcion_motivo_otros as observaciones
     FROM comercial.guia G
     INNER JOIN comercial.empresa E ON E.id_empresa = G.id_empresa
     INNER JOIN comercial.tipodocumento TD ON TD.id_tipodocumento = G.id_tipo_documento_guia
-    INNER JOIN comercial.tipodocumento ON tipodocumento.id_tipodocumento = G.id_tipodocumento
-    INNER JOIN comercial.cliente C ON C.nombres_cliente = G.nombre_representante
-    WHERE G.estado = 'A' AND razonsocial = ''
-    ORDER BY fecha_hora
+    INNER JOIN comercial.tipo_guia TG ON TG.id_tipo_guia = G.id_tipo_guia
+    INNER JOIN comercial.cliente C 
+        ON  (G.ruccliente <> '' AND C.ruc = G.ruccliente)
+        OR  (G.dni_cliente <> '' AND C.dni = G.dni_cliente)
+    WHERE G.estado = 'A' AND G.tipo_transporte IS NOT NULL AND G.estado_declaracion = 'NO DECLARAR'
+    ORDER BY G.fecha_hora
+    LIMIT 5
     """
     sql_detail = """
     SELECT id_detalle_guia, 
@@ -130,6 +156,13 @@ def leer_db_guia():
         guia.placa_vehiculo = row[23]
         guia.cod_empleado = row[24]
         guia.punto_venta = row[25]
+        guia.dni_chofer = row[26]
+        guia.chofer = row[27]
+        guia.tipo_transporte = row[28]
+        guia.peso = row[29]
+        guia.codigo_motivo_traslado = row[30]
+        guia.descripcion_motivo_traslado = row[31]
+        guia.observaciones = row[32]
         detalle_guia = []
         cursor.execute(sql_detail.format(guia.id_guia))
         for deta in cursor.fetchall():
@@ -142,20 +175,20 @@ def leer_db_guia():
     return _generate_lista(lista_guias)
 
 def _generate_lista(guias):
-    
+    # from datetime import datetime
     header_dics = []
     for guia in guias:
         codigo_pais = 'PE'
         header_dic = {}
 
         # Opcionales
-        header_dic['id_guia'] = guia.id_guia
+        header_dic['id_venta'] = guia.id_guia
         header_dic['informacion_adicional'] = "Usuario:"+ guia.cod_empleado +"|Caja: "+ guia.punto_venta
         # Creamos el cuerpo del pse
-        header_dic['serie_documento'] = 'T%s' % guia.serie_documento
+        header_dic['serie_documento'] = '%s' % guia.serie_documento
         header_dic['numero_documento'] = int(guia.numero_documento)
-        header_dic['fecha_de_emision'] = guia.fecha_guia.strftime('%Y-%m-%d')
-        header_dic['hora_de_emision'] = guia.fecha_guia.strftime('%H:%M:%S')
+        header_dic['fecha_de_emision'] = guia.fecha_guia.strftime('%Y-%m-%d') # datetime.now().strftime('%Y-%m-%d')
+        header_dic['hora_de_emision'] = guia.fecha_guia.strftime('%H:%M:%S') # datetime.now().strftime('%H:%M:%S')
         header_dic['codigo_tipo_documento'] = guia.codigo_tipo_documento
         # datos del emisor
         datos_del_emisor = {}
@@ -178,63 +211,56 @@ def _generate_lista(guias):
         datos_del_cliente_o_receptor['telefono'] = guia.telefono_cliente
         header_dic['datos_del_cliente_o_receptor'] = datos_del_cliente_o_receptor
         # continua cuerpo del pse
-        header_dic['observaciones'] = 'aaaaaaaaaa'
-        header_dic['codigo_modo_transporte'] = '01'
-        header_dic['codigo_motivo_traslado'] = '01'
-        header_dic['descripcion_motivo_traslado'] = 'mmmmmmmmmmmmmmmmmmmmmmm'
+        header_dic['observaciones'] = guia.observaciones
+        header_dic['codigo_modo_transporte'] = '01' if guia.tipo_transporte == 'TRANSPORTE PUBLICO' else '02'
+        header_dic['codigo_motivo_traslado'] = guia.codigo_motivo_traslado
+        header_dic['descripcion_motivo_traslado'] = guia.descripcion_motivo_traslado
         header_dic['fecha_de_traslado'] = guia.fecha_traslado.strftime('%Y-%m-%d')
         header_dic['codigo_de_puerto'] = ''
         header_dic['indicador_de_transbordo'] = False
         header_dic['unidad_peso_total'] = 'KGM'
-        header_dic['peso_total'] = 0
+        header_dic['peso_total'] = str(guia.peso)
         header_dic['numero_de_bultos'] = guia.num_bultos
         header_dic['numero_de_contenedor'] = ''
         # direccion partida
         direccion_partida = {}
         direccion_partida['ubigeo'] = '220101'
         direccion_partida['direccion'] = guia.direccion_partida
+        direccion_partida['codigo_del_domicilio_fiscal'] = '0000'
         header_dic['direccion_partida'] = direccion_partida
         # direccion llegada
         direccion_llegada = {}
         direccion_llegada['ubigeo'] = '220101'
         direccion_llegada['direccion'] = guia.direccion_llegada
+        direccion_llegada['codigo_del_domicilio_fiscal'] = '0000'
         header_dic['direccion_llegada'] = direccion_llegada
-        # transportista
-        transportista = {}
-        transportista['codigo_tipo_documento_identidad'] = '6'
-        transportista['numero_documento'] = guia.ruc_transportista
-        transportista['apellidos_y_nombres_o_razon_social'] = guia.transporte
-        header_dic['transportista'] = transportista
-        # chofer   
-        chofer = {}
-        chofer['codigo_tipo_documento_identidad'] = '1'
-        chofer['numero_documento'] = guia.num_licencia
-        header_dic['chofer'] = chofer
-        # continua cuerpo del pse
-        header_dic['numero_de_placa'] = guia.placa_vehiculo
+        if guia.tipo_transporte == 'TRANSPORTE PUBLICO':
+            # transportista
+            transportista = {}
+            transportista['codigo_tipo_documento_identidad'] = '6'
+            transportista['numero_documento'] = guia.ruc_transportista
+            transportista['apellidos_y_nombres_o_razon_social'] = guia.transporte
+            transportista['numero_mtc'] = f'X{guia.ruc_transportista}'
+            header_dic['transportista'] = transportista
+        else:
+            # chofer   
+            chofer = {}
+            chofer['codigo_tipo_documento_identidad'] = '1'
+            chofer['numero_documento'] = guia.dni_chofer
+            chofer['nombres'] = guia.chofer.split(',')[1]
+            chofer['apellidos'] = guia.chofer.split(',')[0]
+            chofer['numero_licencia'] = guia.num_licencia
+            header_dic['chofer'] = chofer
+            header_dic['numero_de_placa'] = guia.placa_vehiculo
 
         # lista de items
         lista_items = []
         for deta in guia.detalle_guias:
             item = {}
-            #precio_producto = deta.monto / deta.cantidad
             item['codigo_interno'] = deta.codigo_producto
-            #item['descripcion'] = deta.nombre_producto
-            #item['codigo_producto_sunat'] = ''
-            #item['codigo_producto_gsl'] = ''
-            #item['unidad_de_medida'] = 'NIU'
+            item['descripcion'] = deta.nombre_producto
+            item['unidad_de_medida'] = 'NIU'
             item['cantidad'] = round(deta.cantidad, 2)
-            #item["valor_unitario"] = round(precio_producto, 2)
-            #item['codigo_tipo_precio'] = '01'
-            #item['precio_unitario'] = precio_producto
-            #item['codigo_tipo_afectacion_igv'] = '20' #if deta.igv == 0 else '10'
-            #item['total_base_igv'] = deta.monto #if deta.igv == 0 else round(deta.monto_total/1.18, 2)
-            #item['porcentaje_igv'] = 18
-            #item['total_igv'] = 0 #if deta.igv == 0 else round(deta.monto_total - (deta.monto_total/1.18), 2) 
-            #item['total_impuestos_bolsa_plastica'] = deta.total_impuestos_bolsa_plastica
-            #item['total_impuestos'] = 0 #if deta.igv == 0 else round(deta.monto_total - (deta.monto_total/1.18), 2)
-            #item['total_valor_item'] = deta.monto #if deta.igv == 0 else round(deta.monto_total/1.18, 2)#(deta.cantidad * deta.precio_producto)
-            #item['total_item'] = deta.monto
             lista_items.append(item)
 
         header_dic['items'] = lista_items

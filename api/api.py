@@ -2,7 +2,6 @@ import requests
 import json
 
 from base.comercial.db import (read_empresa_pgsql, update_no_200, update_venta_pgsql, update_anulados_pgsql, update_notaCredito_pgsql, update_guia_pgsql, update_venta_pgsql_external_id)
-from base.restobar.db import (r_read_empresa_pgsql, r_update_no_200, r_update_venta_pgsql, r_update_anulados_pgsql, r_update_venta_pgsql_external_id)
 from logger import log
 from urllib3.exceptions import InsecureRequestWarning
 
@@ -10,17 +9,14 @@ from urllib3.exceptions import InsecureRequestWarning
 requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
 
 class ApiClient:
-    def __init__(self, tipo):#, url, token):
-        if tipo == 'comercial':
-            convenio = read_empresa_pgsql()
-        elif tipo == 'gulash':
-            convenio = r_read_empresa_pgsql()
+    def __init__(self):
+        convenio = read_empresa_pgsql()
         self.url = convenio[1]
         self.token = 'Bearer ' + convenio[0]
         self.headers = {'Content-type': 'application/json', 'Authorization': self.token}
 
 
-    def _send_cpe(self, ventas, tipo=None):
+    def _send_cpe(self, ventas):
         
         for venta in ventas:
             # Manejamos las excepciones
@@ -32,18 +28,12 @@ class ApiClient:
                 # Adaptamos la respuesta para guardarlo
                 if res.status_code == 200:
                     rest = RespuestaREST( data['success'],"{};filename:{};estado:{}".format(data['data']['cod_sale'],data['data']['filename'], data['data']['state']), data)
-                    if tipo:          
-                        r_update_venta_pgsql_external_id('PROCESADO', rest.message, rest.data['data']['external_id'], int(venta['id_venta']))
-                    else:
-                        update_venta_pgsql_external_id('PROCESADO', rest.message, rest.data['data']['external_id'], int(venta['id_venta']))
+                    update_venta_pgsql_external_id('PROCESADO', rest.message, rest.data['data']['external_id'], int(venta['id_venta']))
                     
                     log.info(f'{rest.message}')
                 else:
                     rest = RespuestaREST(False, data['message'], data)
-                    if tipo:
-                        r_update_venta_pgsql('PROCESADO', ObjJSON(rest.data).encoder(), int(venta['id_venta']))
-                    else:
-                        update_venta_pgsql('PROCESADO', ObjJSON(rest.data).encoder(), int(venta['id_venta']))
+                    update_venta_pgsql('PROCESADO', ObjJSON(rest.data).encoder(), int(venta['id_venta']))
                     log.error(f'{venta["id_venta"]} {venta["serie_documento"]}-{venta["numero_documento"]} {rest.message}')
                         
             except requests.ConnectionError as e:
@@ -64,29 +54,20 @@ class ApiClient:
                 log.warning(f'{rest.message}')
 
 
-    def _send_cpe_anulados(self, data, tipo=None):
+    def _send_cpe_anulados(self, data):
         
         for venta in data:
             try:
-                # Realizamos la llamada al API de envío de documentos
                 res = requests.put(f'{self.url}/api/{venta.id_venta}', headers=self.headers, verify=False)
-                # Obtenemos la respuesta y lo decodificamos
                 data = ObjJSON(res.content.decode("UTF8")).decoder()
-                # Adaptamos la respuesta para guardarlo
                 if res.status_code == 200:
                     rest = RespuestaREST( data['success'],"Anulacion:{};filename:{};estado:{}".format(data['data']['cod_sale'],data['data']['filename'], data['data']['state']), data)
-                    if tipo:
-                        r_update_anulados_pgsql('ANULADO', 'PROCESADO', ObjJSON(rest.data).encoder(), int(venta.id_venta))
-                    else:
-                        update_anulados_pgsql('ANULADO', 'PROCESADO', ObjJSON(rest.data).encoder(), int(venta.id_venta))
+                    update_anulados_pgsql('ANULADO', 'PROCESADO', ObjJSON(rest.data).encoder(), int(venta.id_venta))
                     log.info(f'{rest.message}')
                 else: 
                     rest = RespuestaREST(False, data['message'], data)
                     if (rest.message.find('Document not found!') != -1):
-                        if tipo:
-                            r_update_no_200('PENDIENTE', int(venta.id_venta))
-                        else:
-                            update_no_200('PENDIENTE', int(venta.id_venta))
+                        update_no_200('PENDIENTE', int(venta.id_venta))
                     log.error(f'{rest.message}')
                         
             except requests.ConnectionError as e:
@@ -112,11 +93,8 @@ class ApiClient:
         
         for venta in data:        
             try:
-                # Realizamos la llamada al API de envío de documentos
                 res = requests.post(self.url, json=venta, headers=self.headers, verify=False)
-                # Obtenemos la respuesta y lo decodificamos
                 data = ObjJSON(res.content.decode("UTF8")).decoder()
-                # Adaptamos la respuesta para guardarlo
                 if res.status_code == 200:
                     rest = RespuestaREST( data['success'],"{};filename:{};estado:{}".format(data['data']['cod_sale'],data['data']['filename'], data['data']['state']), data)
                     update_notaCredito_pgsql(ObjJSON(rest.data).encoder(), int(venta['id_venta']))
@@ -145,18 +123,43 @@ class ApiClient:
 
 
     def _send_cpe_guia(self, data):
-        
         for guia in data:
-            #print(guia)
             res = requests.post(self.url, json=guia, headers=self.headers, verify=False)
-            if res.status_code == 200:
-                r_json=res.json()
-                external_id=r_json['data']['external_id']
-                update_guia_pgsql(external_id, int(guia['id_guia']))
-                print(res.content)
-            else:
-                print(res.content)
-                print(res.status_code)
+            response = ObjJSON(res.content.decode("UTF8")).decoder() 
+            try:
+                if res.status_code == 200:
+                    rest = RespuestaREST( response['success'],f"{response['data']['cod_sale']};filename:{response['data']['filename']};estado:{response['data']['state']}", response)
+                    update_guia_pgsql(ObjJSON(rest.data).encoder(), int(guia['id_venta']))
+                    log.info(f'{rest.message}')
+                else:
+                    rest = RespuestaREST(False, response['message'], response)
+                    update_guia_pgsql(ObjJSON(rest.data).encoder(), int(guia['id_venta']))
+                    log.error(f'{guia["id_venta"]} {guia["serie_documento"]}-{guia["numero_documento"]} {rest.message}')
+                        
+            except requests.ConnectionError as e:
+                log.warning(e)
+                rest = RespuestaREST(False, "No se puede establecer una conexión")
+                log.warning(f'{rest.message}')
+            except requests.ConnectTimeout as e:
+                log.warning(e)
+                rest = RespuestaREST(False, "Tiempo de espera de conexión agotada")
+                log.warning(f'{rest.message}')
+            except requests.HTTPError as e:
+                log.warning(e)
+                rest = RespuestaREST(False, "Ruta de enlace no encontrada")
+                log.warning(f'{rest.message}')
+            except requests.RequestException as e:
+                log.warning(e)
+                rest = RespuestaREST(False, "No se puede conectar al servicio")
+                log.warning(f'{rest.message}')
+    
+    def generate_json_file(self, venta, filename):
+        with open(filename, 'w') as f:
+            json.dump(venta, f, indent=4, ensure_ascii=False)
+        f.close()
+        # f = open(f"format_{guia['id_venta']}.json", "a")
+        # f.write(json.dumps(guia))
+        # f.close()
 
 
 # Clase para controlar el formato de respuesta

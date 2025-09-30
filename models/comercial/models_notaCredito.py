@@ -79,7 +79,7 @@ def leer_db_notaCredito():
         venta.external_id = row[6]    
         venta.documento_cliente = row[7]
         venta.nombre_cliente = row[8]
-        venta.direccion_cliente = row[9] if row[9] != None else ''
+        venta.direccion_cliente = row[9] if row[9] is not None else ''
         
         venta.forma_pago = ''
         venta.punto_venta = row[10]
