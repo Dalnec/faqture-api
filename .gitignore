@@ -146,6 +146,7 @@ credentials_Dany.json
 base/credentials.json
 requirements1.txt
 debug.log
+logs/
 prueba.json
 logs.log
 format.json

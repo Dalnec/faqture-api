@@ -20,6 +20,7 @@ class Config:
     state_nventas: bool
     state_guia: bool
     date_header: str
+    debug: bool
 
 def load_config() -> Config:
     """Cargar configuración desde archivo"""
@@ -42,7 +43,8 @@ def load_config() -> Config:
         state_ncredi=config.getboolean('MAIN', 'M_NCREDI'),
         state_nventas=config.getboolean('MAIN', 'M_NVENTAS'),
         state_guia=config.getboolean('MAIN', 'M_GUIA'),
-        date_header=config['MODELS']['DATE_HEADER']
+        date_header=config['MODELS']['DATE_HEADER'],
+        debug=config.getboolean('APP', 'DEBUG', fallback=False)
     )
 
 # Cargar config global al importar el módulo

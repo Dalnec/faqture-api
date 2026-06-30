@@ -128,7 +128,7 @@ def leer_db():
         venta.codigo_tipo_documento_identidad = row[5]
         venta.documento_cliente = row[6]
         venta.nombre_cliente = row[7]
-        venta.direccion_cliente = row[8] if row[8] != None else ''
+        venta.direccion_cliente = row[8] if row[8] is not None else ''
         venta.total_venta = float(row[9])
         venta.vendedor = row[10]
         venta.forma_pago = row[11]
