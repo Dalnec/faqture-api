@@ -139,6 +139,7 @@ Carina.backup
 Carina.backup.gz
 token.pickle
 token.json
+config.ini
 base/backup/credenciales/
 logo.ico
 api.ico

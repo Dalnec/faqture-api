@@ -1,102 +1,109 @@
-from __future__ import print_function
-import os.path
-# import pkg_resources.py2_warn
+import os
 from googleapiclient import errors
 from googleapiclient.discovery import build
 from google_auth_oauthlib.flow import InstalledAppFlow
 from google.auth.transport.requests import Request
 from googleapiclient.http import MediaFileUpload
 from google.oauth2.credentials import Credentials
-from logger import log
+from logger import get_logger
 
-# If modifying these scopes, delete the file token.pickle.
-SCOPES = ['https://www.googleapis.com/auth/drive.appdata', 'https://www.googleapis.com/auth/drive.file'] #.metadata.readonly']
+log = get_logger()
 
-def getCredentials():
-    creds = None
-    if os.path.exists("token.json"):
-        creds = Credentials.from_authorized_user_file("token.json", SCOPES)
-    # If there are no (valid) credentials available, let the user log in.
-    if not creds or not creds.valid:
-        if creds and creds.expired and creds.refresh_token:
-            creds.refresh(Request())
-        else:
-            flow = InstalledAppFlow.from_client_secrets_file(
-                'base/credentials.json', SCOPES
-            )
-            creds = flow.run_local_server(port=0)
-        # Save the credentials for the next run
-        with open("token.json", "w") as token:
-            token.write(creds.to_json())
+SCOPES = [
+    'https://www.googleapis.com/auth/drive.appdata',
+    'https://www.googleapis.com/auth/drive.file',
+]
 
-    service = build('drive', 'v3', credentials=creds, cache_discovery=False, static_discovery=False)
-    return service
+CREDENTIALS_PATH = 'base/credentials.json'
+TOKEN_PATH = 'token.json'
+BACKUP_MIME_TYPE = 'application/gzip'
 
-def list_items():
-    services = getCredentials()
-    results = services.files().list(
-        pageSize=5, fields="nextPageToken, files(id, name)"
-    ).execute()
-    items = results.get('files', [])
 
-    if not items:
-        log.info('No files found.')
-    else:
-        log.info('Files:')
-        for item in items:
-            log.info(u'{0} ({1})'.format(item['name'], item['id']))
+class DriveClient:
+    """Cliente reutilizable para Google Drive."""
 
-def uploadFile(filename,filepath,mimetype):
-    services = getCredentials()
-    log.info('Backup Uploading...')
-    file_metadata = {'name': filename}
-    media = MediaFileUpload(
-        filepath, 
-        mimetype = mimetype, 
-        resumable = True #resumable=True para enviar achivos mayores a 5MB
-    ) 
-    file = services.files().create(
-        body = file_metadata,
-        media_body = media,
-        fields='id'
-    ).execute()
-    return log.info('Uploaded: %s' % (file.get('id')))
+    def __init__(self):
+        self._service = None
 
-def searchFile(size, query, filename):
-    services = getCredentials()
-    log.info('Searching File...')
-    f_mT = 'application/x-rar-compressed'
-    results = services.files().list(
-        pageSize = size,
-        fields = "nextPageToken, files(id)",
-        q=query
-    ).execute()
-    items = results.get('files', [])
-    if not items:
-        log.info('No files found.')        
-        uploadFile(filename, filename, f_mT)
-    else:
-        for item in items:            
-            fileId = item['id']
-        updateFile(fileId, filename, f_mT)
-        return item
-    
-def updateFile(file_id, new_filename, new_mime_type):
-    services = getCredentials()
-    log.info('Backup Updating...')
-    try:
-        file = {}
-        media_body = MediaFileUpload(
-            new_filename, 
-            mimetype=new_mime_type, 
-            resumable=True
-        )
-        updated_file = services.files().update(
-            fileId=file_id,                                           
-            body=file,
-            media_body=media_body
-        ).execute()
-        return log.info('Updated: %s' % (updated_file['id']))
-    except errors.HttpError as error:
-        log.error('%s An error occurred: %s' % (error)) 
-        return None
+    def _get_service(self):
+        if self._service is None:
+            self._service = self._build_service()
+        return self._service
+
+    def _build_service(self):
+        creds = None
+        if os.path.exists(TOKEN_PATH):
+            creds = Credentials.from_authorized_user_file(TOKEN_PATH, SCOPES)
+
+        if not creds or not creds.valid:
+            if creds and creds.expired and creds.refresh_token:
+                creds.refresh(Request())
+            else:
+                flow = InstalledAppFlow.from_client_secrets_file(CREDENTIALS_PATH, SCOPES)
+                creds = flow.run_local_server(port=0)
+
+            with open(TOKEN_PATH, "w") as token:
+                token.write(creds.to_json())
+
+        return build('drive', 'v3', credentials=creds, cache_discovery=False, static_discovery=False)
+
+    def _find_file(self, filename):
+        """Buscar archivo por nombre. Retorna file_id o None."""
+        service = self._get_service()
+        log.info(f'[DRIVE] Buscando: {filename}')
+        try:
+            results = service.files().list(
+                pageSize=10,
+                fields="nextPageToken, files(id, name)",
+                q=f"name='{filename}'"
+            ).execute()
+            items = results.get('files', [])
+            if items:
+                return items[0]['id']
+            return None
+        except errors.HttpError as error:
+            log.error(f'[DRIVE] Error buscando archivo: {error}')
+            return None
+
+    def upload_or_update(self, filename, filepath, mimetype=BACKUP_MIME_TYPE):
+        """Sube o actualiza un archivo en Drive. Retorna file_id o None."""
+        file_id = self._find_file(filename)
+        if file_id:
+            return self._update_file(file_id, filepath, mimetype)
+        return self._upload_file(filename, filepath, mimetype)
+
+    def _upload_file(self, filename, filepath, mimetype):
+        """Subir archivo nuevo a Drive."""
+        service = self._get_service()
+        log.info(f'[DRIVE] Subiendo: {filename}')
+        try:
+            file_metadata = {'name': filename}
+            media = MediaFileUpload(filepath, mimetype=mimetype, resumable=True)
+            file = service.files().create(
+                body=file_metadata,
+                media_body=media,
+                fields='id'
+            ).execute()
+            file_id = file.get('id')
+            log.info(f'[DRIVE] Subido: {file_id}')
+            return file_id
+        except errors.HttpError as error:
+            log.error(f'[DRIVE] Error subiendo archivo: {error}')
+            return None
+
+    def _update_file(self, file_id, filepath, mimetype):
+        """Actualizar archivo existente en Drive."""
+        service = self._get_service()
+        log.info(f'[DRIVE] Actualizando: {file_id}')
+        try:
+            media_body = MediaFileUpload(filepath, mimetype=mimetype, resumable=True)
+            updated_file = service.files().update(
+                fileId=file_id,
+                body={},
+                media_body=media_body
+            ).execute()
+            log.info(f'[DRIVE] Actualizado: {updated_file["id"]}')
+            return updated_file['id']
+        except errors.HttpError as error:
+            log.error(f'[DRIVE] Error actualizando archivo: {error}')
+            return None

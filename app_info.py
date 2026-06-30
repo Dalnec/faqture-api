@@ -7,7 +7,7 @@ APP_INFO = {
     "type": "api",
     "version": "1.3.0",
     "build_date": "2026-06-27",
-    "source_branch": _branch if (_branch := None) else "unknown",
+    "source_branch": "unknown",
 }
 
 

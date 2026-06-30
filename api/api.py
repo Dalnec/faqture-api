@@ -11,7 +11,8 @@ from logger import get_logger
 from config import CONFIG
 from urllib3.exceptions import InsecureRequestWarning
 
-requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
+if not CONFIG.api_ssl_verify:
+    requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
 
 log = get_logger()
 DEBUG = CONFIG.debug
@@ -23,6 +24,7 @@ class ApiClient:
         self.url = convenio[1]
         self.token = 'Bearer ' + convenio[0]
         self.headers = {'Content-type': 'application/json', 'Authorization': self.token}
+        self.verify = CONFIG.api_ssl_verify
         log.info(f'[API] Cliente inicializado | url={self.url}')
 
     def _log_payload(self, payload, label="payload"):
@@ -33,173 +35,114 @@ class ApiClient:
         if DEBUG:
             log.debug(f'[RESPONSE] status={response.status_code} time={elapsed_ms}ms body={response.text[:2000]}')
 
-    def _send_cpe(self, ventas):
-        for venta in ventas:
-            doc_id = venta.get('id_venta', '?')
-            doc_ref = f"{venta.get('serie_documento', '?')}-{venta.get('numero_documento', '?')}"
-            try:
-                self._log_payload(venta, f'ENVIO payload id={doc_id}')
-                start = _time.monotonic()
-                res = requests.post(self.url, json=venta, headers=self.headers, verify=False)
-                elapsed = int((_time.monotonic() - start) * 1000)
-                self._log_response(res, elapsed)
+    def _request(self, method, url, **kwargs):
+        start = _time.monotonic()
+        res = requests.request(method, url, headers=self.headers, verify=self.verify, **kwargs)
+        elapsed = int((_time.monotonic() - start) * 1000)
+        self._log_response(res, elapsed)
+        return res, elapsed
 
-                data = ObjJSON(res.content.decode("UTF8")).decoder()
+    def _handle_send(self, items, process_name, get_id, get_ref, method, update_success, update_error, endpoint_fn=None):
+        for item in items:
+            doc_id = get_id(item)
+            doc_ref = get_ref(item)
+            try:
+                self._log_payload(item if isinstance(item, dict) else {'id': doc_id}, f'{process_name} payload id={doc_id}')
+                url = endpoint_fn(doc_id) if endpoint_fn else self.url
+                res, elapsed = self._request(method, url, json=item if isinstance(item, dict) else None)
+                data = json.loads(res.content)
+
                 if res.status_code == 200:
-                    rest = RespuestaREST(
-                        data['success'],
-                        "{};filename:{};estado:{}".format(
-                            data['data']['cod_sale'], data['data']['filename'], data['data']['state']
-                        ), data
+                    message = "{};filename:{};estado:{}".format(
+                        data['data']['cod_sale'], data['data']['filename'], data['data']['state']
                     )
-                    update_venta_pgsql_external_id(
-                        'PROCESADO', rest.message, rest.data['data']['external_id'], int(venta['id_venta'])
-                    )
-                    log.info(f'[ENVIO] id={doc_id} {doc_ref} -> PROCESADO ({elapsed}ms)')
+                    update_success(item, doc_id, message, data)
+                    log.info(f'[{process_name}] id={doc_id} {doc_ref} -> PROCESADO ({elapsed}ms)')
                 else:
-                    rest = RespuestaREST(False, data['message'], data)
-                    update_venta_pgsql('PROCESADO', ObjJSON(rest.data).encoder(), int(venta['id_venta']))
-                    log.error(f'[ENVIO] id={doc_id} {doc_ref} -> Error: {rest.message} ({elapsed}ms)')
+                    update_error(item, doc_id, data['message'], data)
+                    log.error(f'[{process_name}] id={doc_id} {doc_ref} -> Error: {data["message"]} ({elapsed}ms)')
 
             except requests.ConnectionError as e:
-                log.warning(f'[ENVIO] id={doc_id} {doc_ref} -> ConnectionError: {e}')
-            except requests.ConnectTimeout as e:
-                log.warning(f'[ENVIO] id={doc_id} {doc_ref} -> Timeout: {e}')
+                log.warning(f'[{process_name}] id={doc_id} {doc_ref} -> ConnectionError: {e}')
+            except requests.Timeout as e:
+                log.warning(f'[{process_name}] id={doc_id} {doc_ref} -> Timeout: {e}')
             except requests.HTTPError as e:
-                log.warning(f'[ENVIO] id={doc_id} {doc_ref} -> HTTPError: {e}')
+                log.warning(f'[{process_name}] id={doc_id} {doc_ref} -> HTTPError: {e}')
             except requests.RequestException as e:
-                log.warning(f'[ENVIO] id={doc_id} {doc_ref} -> RequestException: {e}')
+                log.warning(f'[{process_name}] id={doc_id} {doc_ref} -> RequestException: {e}')
+
+    def _send_cpe(self, ventas):
+        def on_success(venta, doc_id, message, data):
+            update_venta_pgsql_external_id(
+                'PROCESADO', message, data['data']['external_id'], int(venta['id_venta'])
+            )
+
+        def on_error(venta, doc_id, message, data):
+            update_venta_pgsql('PROCESADO', json.dumps(data, default=str), int(venta['id_venta']))
+
+        self._handle_send(
+            items=ventas,
+            process_name='ENVIO',
+            get_id=lambda v: v.get('id_venta', '?'),
+            get_ref=lambda v: f"{v.get('serie_documento', '?')}-{v.get('numero_documento', '?')}",
+            method='POST',
+            update_success=on_success,
+            update_error=on_error,
+        )
 
     def _send_cpe_anulados(self, data):
-        for venta in data:
-            doc_id = venta.id_venta
-            try:
-                self._log_payload({'id_venta': doc_id, 'action': 'anular'}, f'ANULACION payload id={doc_id}')
-                start = _time.monotonic()
-                res = requests.put(f'{self.url}/api/{doc_id}', headers=self.headers, verify=False)
-                elapsed = int((_time.monotonic() - start) * 1000)
-                self._log_response(res, elapsed)
+        def on_success(venta, doc_id, message, resp_data):
+            update_anulados_pgsql('ANULADO', 'PROCESADO', json.dumps(resp_data, default=str), int(doc_id))
 
-                resp_data = ObjJSON(res.content.decode("UTF8")).decoder()
-                if res.status_code == 200:
-                    rest = RespuestaREST(
-                        resp_data['success'],
-                        "Anulacion:{};filename:{};estado:{}".format(
-                            resp_data['data']['cod_sale'], resp_data['data']['filename'], resp_data['data']['state']
-                        ), resp_data
-                    )
-                    update_anulados_pgsql('ANULADO', 'PROCESADO', ObjJSON(rest.data).encoder(), int(doc_id))
-                    log.info(f'[ANULACION] id={doc_id} -> ANULADO ({elapsed}ms)')
-                else:
-                    rest = RespuestaREST(False, resp_data['message'], resp_data)
-                    if 'Document not found!' in rest.message:
-                        update_no_200('PENDIENTE', int(doc_id))
-                    log.error(f'[ANULACION] id={doc_id} -> Error: {rest.message} ({elapsed}ms)')
+        def on_error(venta, doc_id, message, resp_data):
+            if 'Document not found!' in message:
+                update_no_200('PENDIENTE', int(doc_id))
 
-            except requests.ConnectionError as e:
-                log.warning(f'[ANULACION] id={doc_id} -> ConnectionError: {e}')
-            except requests.ConnectTimeout as e:
-                log.warning(f'[ANULACION] id={doc_id} -> Timeout: {e}')
-            except requests.HTTPError as e:
-                log.warning(f'[ANULACION] id={doc_id} -> HTTPError: {e}')
-            except requests.RequestException as e:
-                log.warning(f'[ANULACION] id={doc_id} -> RequestException: {e}')
+        self._handle_send(
+            items=data,
+            process_name='ANULACION',
+            get_id=lambda v: v.id_venta,
+            get_ref=lambda v: '',
+            method='PUT',
+            update_success=on_success,
+            update_error=on_error,
+            endpoint_fn=lambda doc_id: f'{self.url}/api/{doc_id}',
+        )
 
     def _send_cpe_notaCredito(self, data):
-        for venta in data:
-            doc_id = venta.get('id_venta', '?')
-            doc_ref = f"{venta.get('serie_documento', '?')}-{venta.get('numero_documento', '?')}"
-            try:
-                self._log_payload(venta, f'NOTA_CREDITO payload id={doc_id}')
-                start = _time.monotonic()
-                res = requests.post(self.url, json=venta, headers=self.headers, verify=False)
-                elapsed = int((_time.monotonic() - start) * 1000)
-                self._log_response(res, elapsed)
+        def on_success(venta, doc_id, message, resp_data):
+            update_notaCredito_pgsql(json.dumps(resp_data, default=str), int(venta['id_venta']))
 
-                resp_data = ObjJSON(res.content.decode("UTF8")).decoder()
-                if res.status_code == 200:
-                    rest = RespuestaREST(
-                        resp_data['success'],
-                        "{};filename:{};estado:{}".format(
-                            resp_data['data']['cod_sale'], resp_data['data']['filename'], resp_data['data']['state']
-                        ), resp_data
-                    )
-                    update_notaCredito_pgsql(ObjJSON(rest.data).encoder(), int(venta['id_venta']))
-                    log.info(f'[NOTA_CREDITO] id={doc_id} {doc_ref} -> PROCESADO ({elapsed}ms)')
-                else:
-                    rest = RespuestaREST(False, resp_data['message'], resp_data)
-                    update_notaCredito_pgsql(ObjJSON(rest.data).encoder(), int(venta['id_venta']))
-                    log.error(f'[NOTA_CREDITO] id={doc_id} {doc_ref} -> Error: {rest.message} ({elapsed}ms)')
+        def on_error(venta, doc_id, message, resp_data):
+            update_notaCredito_pgsql(json.dumps(resp_data, default=str), int(venta['id_venta']))
 
-            except requests.ConnectionError as e:
-                log.warning(f'[NOTA_CREDITO] id={doc_id} {doc_ref} -> ConnectionError: {e}')
-            except requests.ConnectTimeout as e:
-                log.warning(f'[NOTA_CREDITO] id={doc_id} {doc_ref} -> Timeout: {e}')
-            except requests.HTTPError as e:
-                log.warning(f'[NOTA_CREDITO] id={doc_id} {doc_ref} -> HTTPError: {e}')
-            except requests.RequestException as e:
-                log.warning(f'[NOTA_CREDITO] id={doc_id} {doc_ref} -> RequestException: {e}')
+        self._handle_send(
+            items=data,
+            process_name='NOTA_CREDITO',
+            get_id=lambda v: v.get('id_venta', '?'),
+            get_ref=lambda v: f"{v.get('serie_documento', '?')}-{v.get('numero_documento', '?')}",
+            method='POST',
+            update_success=on_success,
+            update_error=on_error,
+        )
 
     def _send_cpe_guia(self, data):
-        for guia in data:
-            doc_id = guia.get('id_venta', '?')
-            doc_ref = f"{guia.get('serie_documento', '?')}-{guia.get('numero_documento', '?')}"
-            try:
-                self._log_payload(guia, f'GUIA payload id={doc_id}')
-                start = _time.monotonic()
-                res = requests.post(self.url, json=guia, headers=self.headers, verify=False)
-                elapsed = int((_time.monotonic() - start) * 1000)
-                self._log_response(res, elapsed)
+        def on_success(guia, doc_id, message, resp_data):
+            update_guia_pgsql(json.dumps(resp_data, default=str), int(guia['id_venta']))
 
-                response = ObjJSON(res.content.decode("UTF8")).decoder()
-                if res.status_code == 200:
-                    rest = RespuestaREST(
-                        response['success'],
-                        f"{response['data']['cod_sale']};filename:{response['data']['filename']};estado:{response['data']['state']}",
-                        response
-                    )
-                    update_guia_pgsql(ObjJSON(rest.data).encoder(), int(guia['id_venta']))
-                    log.info(f'[GUIA] id={doc_id} {doc_ref} -> PROCESADO ({elapsed}ms)')
-                else:
-                    rest = RespuestaREST(False, response['message'], response)
-                    update_guia_pgsql(ObjJSON(rest.data).encoder(), int(guia['id_venta']))
-                    log.error(f'[GUIA] id={doc_id} {doc_ref} -> Error: {rest.message} ({elapsed}ms)')
+        def on_error(guia, doc_id, message, resp_data):
+            update_guia_pgsql(json.dumps(resp_data, default=str), int(guia['id_venta']))
 
-            except requests.ConnectionError as e:
-                log.warning(f'[GUIA] id={doc_id} {doc_ref} -> ConnectionError: {e}')
-            except requests.ConnectTimeout as e:
-                log.warning(f'[GUIA] id={doc_id} {doc_ref} -> Timeout: {e}')
-            except requests.HTTPError as e:
-                log.warning(f'[GUIA] id={doc_id} {doc_ref} -> HTTPError: {e}')
-            except requests.RequestException as e:
-                log.warning(f'[GUIA] id={doc_id} {doc_ref} -> RequestException: {e}')
+        self._handle_send(
+            items=data,
+            process_name='GUIA',
+            get_id=lambda v: v.get('id_venta', '?'),
+            get_ref=lambda v: f"{v.get('serie_documento', '?')}-{v.get('numero_documento', '?')}",
+            method='POST',
+            update_success=on_success,
+            update_error=on_error,
+        )
 
     def generate_json_file(self, venta, filename):
         with open(filename, 'w') as f:
             json.dump(venta, f, indent=4, ensure_ascii=False)
-
-
-class RespuestaREST:
-    def __init__(self, success, message, data=None):
-        self.__success = success
-        self.message = message
-        self.data = data
-
-    def isSuccess(self):
-        return self.__success
-
-
-class ObjModelEncoder(json.JSONEncoder):
-    def default(self, obj):
-        return obj.__dict__
-
-
-class ObjJSON:
-    def __init__(self, obj):
-        self.obj = obj
-
-    def encoder(self):
-        return json.dumps(self.obj, cls=ObjModelEncoder, indent=4, ensure_ascii=False)
-
-    def decoder(self):
-        return json.loads(self.obj)

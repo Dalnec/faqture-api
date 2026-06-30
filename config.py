@@ -1,3 +1,4 @@
+import os
 import configparser
 from dataclasses import dataclass
 
@@ -21,9 +22,13 @@ class Config:
     state_guia: bool
     date_header: str
     debug: bool
+    api_ssl_verify: bool
 
 def load_config() -> Config:
     """Cargar configuración desde archivo"""
+    if not os.path.exists('config.ini'):
+        raise FileNotFoundError("config.ini no encontrado")
+
     config = configparser.ConfigParser()
     config.read('config.ini')
     
@@ -44,7 +49,8 @@ def load_config() -> Config:
         state_nventas=config.getboolean('MAIN', 'M_NVENTAS'),
         state_guia=config.getboolean('MAIN', 'M_GUIA'),
         date_header=config['MODELS']['DATE_HEADER'],
-        debug=config.getboolean('APP', 'DEBUG', fallback=False)
+        debug=config.getboolean('APP', 'DEBUG', fallback=False),
+        api_ssl_verify=config.getboolean('API', 'SSL_VERIFY', fallback=False),
     )
 
 # Cargar config global al importar el módulo

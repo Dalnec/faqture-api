@@ -7,6 +7,7 @@ from typing import Callable
 from app_info import handle_version_arg, show_banner, APP_INFO
 from config import CONFIG, Config
 from logger import setup_logger
+from base.comercial.db import init_pool, close_pool
 
 handle_version_arg()
 
@@ -14,8 +15,9 @@ handle_version_arg()
 class ProcessManager:
     """Gestor de procesos de negocio"""
 
-    def __init__(self, config: Config):
+    def __init__(self, config: Config, log):
         self.config = config
+        self.log = log
         self.api_client = None
         self._setup_imports()
         self._setup_api_client()
@@ -25,15 +27,15 @@ class ProcessManager:
         sys.path.extend(['models', 'base', 'api', 'backup'])
 
         try:
-            from models.comercial.models import leer_db
-            from models.comercial.models_notaventa import leer_db_notas
+            from models.comercial.ventas import leer_db_documentos
+            from models.comercial.ventas import leer_db_notas
             from models.comercial.models_anulate import leer_db_anulados
             from models.comercial.models_notaCredito import leer_db_notaCredito
             from models.comercial.models_guiaRemision import leer_db_guia
             from base.backup.backup import backup
 
             self.readers = {
-                'doc': leer_db,
+                'doc': leer_db_documentos,
                 'anul': leer_db_anulados,
                 'nventas': leer_db_notas,
                 'ncredi': leer_db_notaCredito,
@@ -120,9 +122,10 @@ def main():
     log.info(f"Debug mode: {'ON' if config.debug else 'OFF'}")
     log.info("Iniciando procesamiento continuo...")
 
+    init_pool()
+
     try:
-        processor = ProcessManager(config)
-        processor.log = log
+        processor = ProcessManager(config, log)
 
         while True:
             processor.run_cycle()
@@ -133,6 +136,8 @@ def main():
     except Exception as e:
         log.error(f"Error critico: {e}", exc_info=True)
         raise
+    finally:
+        close_pool()
 
 
 if __name__ == "__main__":
