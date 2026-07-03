@@ -1,3 +1,4 @@
+import os
 import sys
 import subprocess
 
@@ -5,8 +6,8 @@ import subprocess
 APP_INFO = {
     "client": "Faqture",
     "type": "api",
-    "version": "1.3.0",
-    "build_date": "2026-06-27",
+    "version": os.environ.get("APP_VERSION", "1.3.0"),
+    "build_date": os.environ.get("APP_BUILD_DATE", "2026-06-27"),
     "source_branch": "unknown",
 }
 

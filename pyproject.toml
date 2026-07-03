@@ -1,8 +1,8 @@
 [project]
 name = "faqture-api"
-version = "0.1.0"
-description = "Add your description here"
-requires-python = ">=3.14"
+version = "1.3.0"
+description = "Sistema de procesamiento de comprobantes electronicos SUNAT"
+requires-python = ">=3.12,<3.14"
 dependencies = [
     "google-api-python-client>=2.198.0",
     "google-auth-oauthlib>=1.4.0",
@@ -12,6 +12,11 @@ dependencies = [
     "pytest>=9.1.1",
     "requests>=2.34.2",
     "urllib3>=2.7.0",
+]
+
+[dependency-groups]
+dev = [
+    "pyinstaller>=6.0",
 ]
 
 [tool.pytest.ini_options]

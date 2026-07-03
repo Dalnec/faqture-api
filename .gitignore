@@ -154,3 +154,11 @@ format.json
 format1.json
 *.exe
 requirements_backup.txt
+
+# Updater / Service logs
+updater.log
+service.log
+
+# Installer build output
+installer/dist/
+installer/bin/nssm.exe

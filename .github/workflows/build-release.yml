@@ -1,0 +1,98 @@
+name: Build & Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Extract version from tag
+        id: version
+        shell: bash
+        run: |
+          TAG="${GITHUB_REF#refs/tags/v}"
+          echo "VERSION=$TAG" >> "$GITHUB_OUTPUT"
+          echo "Building version: $TAG"
+
+      - name: Setup uv
+        uses: astral-sh/setup-uv@v3
+
+      - name: Install Python and dependencies
+        run: |
+          uv python install 3.13
+          uv sync --frozen
+
+      - name: Inject version into app_info.py
+        shell: bash
+        run: |
+          VERSION="${{ steps.version.outputs.VERSION }}"
+          BUILD_DATE="$(date +%Y-%m-%d)"
+          sed -i "s/os.environ.get(\"APP_VERSION\", \"1.3.0\")/\"${VERSION}\"/" app_info.py
+          sed -i "s/os.environ.get(\"APP_BUILD_DATE\", \"2026-06-27\")/\"${BUILD_DATE}\"/" app_info.py
+          echo "--- app_info.py after injection ---"
+          grep -E "(version|build_date)" app_info.py
+
+      - name: Build faqture.exe
+        run: |
+          uv run pyinstaller --onefile --console --name faqture main.py
+
+      - name: Build updater.exe
+        run: |
+          uv run pyinstaller --onefile --console --name updater updater/updater.py
+
+      - name: Download NSSM 2.24
+        shell: pwsh
+        run: |
+          $url = "https://nssm.cc/release/nssm-2.24.zip"
+          $zip = "$env:TEMP\nssm.zip"
+          Invoke-WebRequest -Uri $url -OutFile $zip
+          Expand-Archive -Path $zip -DestinationPath "$env:TEMP\nssm" -Force
+          Copy-Item "$env:TEMP\nssm\nssm-2.24\win64\nssm.exe" -Destination "installer\bin\nssm.exe"
+          Write-Host "NSSM downloaded successfully"
+
+      - name: Generate version.txt
+        shell: bash
+        run: |
+          echo "${{ steps.version.outputs.VERSION }}" > dist/version.txt
+
+      - name: Copy binaries to installer/dist
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path "installer\dist"
+          Copy-Item "dist\faqture.exe" -Destination "installer\dist\"
+          Copy-Item "dist\updater.exe" -Destination "installer\dist\"
+          Copy-Item "dist\version.txt" -Destination "installer\dist\"
+
+      - name: Install Inno Setup
+        run: choco install innosetup -y
+
+      - name: Compile installer
+        shell: pwsh
+        run: |
+          $iscc = "C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
+          & $iscc /DAPP_VERSION=${{ steps.version.outputs.VERSION }} installer\installer.iss
+
+      - name: Upload installer artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Faqture-${{ steps.version.outputs.VERSION }}-Setup
+          path: installer/dist/*.exe
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: Faqture v${{ steps.version.outputs.VERSION }}
+          generate_release_notes: true
+          files: |
+            installer/dist/*.exe

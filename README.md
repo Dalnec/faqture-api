@@ -223,9 +223,11 @@ faqture-api/
 ├── main.py                          # Entry point, loop principal
 ├── config.py                        # Config dataclass + loader
 ├── config.ini                       # Configuración (no versionado)
+├── config.ini.example               # Template de configuración
 ├── logger.py                        # Logger con consola coloreada + archivos rotativos
 ├── app_info.py                      # Versión y banner de la app
 ├── pyproject.toml                   # Dependencias y config pytest
+├── Faqture.spec                     # PyInstaller spec para build Windows
 │
 ├── api/
 │   └── api.py                       # ApiClient para enviar comprobantes al API externo
@@ -244,6 +246,18 @@ faqture-api/
 │       ├── models_anulate.py        # Lectura de anulaciones
 │       ├── models_notaCredito.py    # Lectura de notas de crédito/débito
 │       └── models_guiaRemision.py   # Lectura de guías de remisión
+│
+├── updater/
+│   └── updater.py                   # Auto-updater (binario independiente)
+│
+├── installer/
+│   ├── installer.iss                # Script de Inno Setup
+│   └── bin/
+│       └── nssm.exe                 # NSSM (descargado en CI)
+│
+├── .github/
+│   └── workflows/
+│       └── build-release.yml        # CI/CD: build + release
 │
 ├── tests/
 │   ├── test_config.py               # Tests de configuración
@@ -334,3 +348,85 @@ Los logs se escriben en `logs/` con rotación automática (5 MB, 5 backups):
 Formato: `2025-06-15 10:30:00 [INFO    ] [module:42] mensaje`
 
 En consola se muestran con colores ANSI.
+
+## Empaquetado y Distribución
+
+### Flujo de Release
+
+1. Asegurarse de que la versión en `app_info.py` (o la variable de entorno `APP_VERSION`) esté actualizada
+2. Crear y push un tag:
+   ```bash
+   git tag v1.3.0
+   git push origin v1.3.0
+   ```
+3. GitHub Actions ejecuta automáticamente el workflow `build-release.yml`:
+   - Compila `faqture.exe` y `updater.exe` con PyInstaller
+   - Descarga NSSM 2.24
+   - Compila el instalador con Inno Setup
+   - Crea un GitHub Release con el instalador adjunto
+
+### Build Local
+
+```bash
+# Instalar dependencias de desarrollo
+uv sync
+
+# Compilar ejecutables
+uv run pyinstaller --onefile --console --name faqture main.py
+uv run pyinstaller --onefile --console --name updater updater/updater.py
+
+# Compilar instalador (requiere Inno Setup instalado)
+ISCC.exe /DAPP_VERSION=1.3.0 installer\installer.iss
+```
+
+### Variables de Entorno (CI)
+
+| Variable | Uso |
+|----------|-----|
+| `APP_VERSION` | Versión inyectada en `app_info.py` durante el build |
+| `APP_BUILD_DATE` | Fecha de build inyectada en `app_info.py` |
+
+### Instalador
+
+El instalador (Inno Setup) realiza:
+
+1. Copia `faqture.exe`, `updater.exe`, `nssm.exe`, `version.txt`, `config.ini` a `C:\Program Files\Faqture\`
+2. Instala `FaqtureServicio` como servicio Windows via NSSM
+3. Configura logs en `service.log`
+4. Crea tarea programada `FaqtureUpdater` (cada 6 horas)
+5. Inicia el servicio automáticamente
+
+### Auto-Actualización
+
+El updater (`updater.exe`) se ejecuta cada 6 horas via tarea programada:
+
+1. Lee `version.txt` del directorio de instalación
+2. Consulta la última release en GitHub (`GET /repos/Dalnec/faqture-api/releases/latest`)
+3. Compara versiones (sem tolerante a prefijo `v`)
+4. Si hay nueva versión:
+   - Descarga el `*Setup.exe` de la release
+   - Detiene el servicio (`nssm stop FaqtureServicio`)
+   - Ejecuta el instalador silencioso
+   - El servicio se reinicia automáticamente
+
+### Requisito: FAQTURE_UPDATE_TOKEN
+
+> **IMPORTANTE**: Este repositorio es privado. El updater **necesita** un token de acceso para consultar la API de GitHub.
+
+Configurar en cada máquina cliente como variable de entorno del sistema:
+
+```
+FAQTURE_UPDATE_TOKEN=ghp_tu_token_aqui
+```
+
+El token necesita permisos `repo` (lectura de releases). Generarlo en:
+GitHub > Settings > Developer settings > Personal access tokens
+
+### Logs en Máquina Cliente
+
+| Archivo | Ubicación | Contenido |
+|---------|-----------|-----------|
+| `logs/faqture.log` | Directorio de instalación | Todos los niveles |
+| `logs/faqture_error.log` | Directorio de instalación | Solo errores |
+| `service.log` | Directorio de instalación | stdout/stderr del servicio (NSSM) |
+| `updater.log` | Directorio de instalación | Log del auto-updater |

@@ -1,5 +1,6 @@
 import time
 import sys
+import signal
 import logging
 from datetime import datetime
 from typing import Callable
@@ -10,6 +11,20 @@ from logger import setup_logger
 from base.comercial.db import init_pool, close_pool
 
 handle_version_arg()
+
+running = True
+
+
+def _shutdown(signum, frame):
+    global running
+    log = logging.getLogger('faqture')
+    log.info(f"Senal {signum} recibida, cerrando servicio...")
+    running = False
+
+
+signal.signal(signal.SIGTERM, _shutdown)
+if hasattr(signal, 'SIGBREAK'):
+    signal.signal(signal.SIGBREAK, _shutdown)
 
 
 class ProcessManager:
@@ -127,17 +142,16 @@ def main():
     try:
         processor = ProcessManager(config, log)
 
-        while True:
+        while running:
             processor.run_cycle()
             time.sleep(0.5)
 
-    except KeyboardInterrupt:
-        log.info("Procesamiento interrumpido por el usuario")
     except Exception as e:
         log.error(f"Error critico: {e}", exc_info=True)
         raise
     finally:
         close_pool()
+        log.info("Servicio detenido correctamente")
 
 
 if __name__ == "__main__":
