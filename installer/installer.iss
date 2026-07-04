@@ -133,7 +133,7 @@ begin
   BackupEnabled := TNewCheckBox.Create(BackupPage.Surface);
   BackupEnabled.Parent := BackupPage.Surface;
   BackupEnabled.Left := ScaleX(20);
-  BackupEnabled.Top := BackupPage.Fields[2].Top + ScaleY(30);
+  BackupEnabled.Top := BackupPage.Edits[2].Top + ScaleY(30);
   BackupEnabled.Width := ScaleX(400);
   BackupEnabled.Caption := 'Habilitar backup automático (BU_STATE)';
   BackupEnabled.Checked := False;
@@ -203,7 +203,7 @@ begin
   DebugCheck := TNewCheckBox.Create(OptPage.Surface);
   DebugCheck.Parent := OptPage.Surface;
   DebugCheck.Left := ScaleX(20);
-  DebugCheck.Top := OptPage.Fields[0].Top + ScaleY(30);
+  DebugCheck.Top := OptPage.Edits[0].Top + ScaleY(30);
   DebugCheck.Width := ScaleX(400);
   DebugCheck.Caption := 'Modo debug (DEBUG) — logs detallados';
   DebugCheck.Checked := False;
