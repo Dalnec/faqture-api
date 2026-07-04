@@ -87,7 +87,7 @@ var
   BackupEnabled: TNewCheckBox;
   BackupDrive: TNewCheckBox;
   // Main processes page
-  ProcPage: TNewWizardPage;
+  ProcPage: TInputQueryWizardPage;
   ProcDocCheck: TNewCheckBox;
   ProcAnulCheck: TNewCheckBox;
   ProcNcrediCheck: TNewCheckBox;
@@ -147,9 +147,10 @@ begin
   BackupDrive.Checked := False;
 
   // === Page 3: Processes ===
-  ProcPage := CreateCustomPage(BackupPage.ID,
+  ProcPage := CreateInputQueryPage(BackupPage.ID,
     'Procesos Habilitados',
-    'Seleccione qué procesos ejecutar en cada ciclo');
+    'Seleccione qué procesos ejecutar en cada ciclo',
+    'Solo los procesos marcados se ejecutarán automáticamente.');
 
   ProcDocCheck := TNewCheckBox.Create(ProcPage.Surface);
   ProcDocCheck.Parent := ProcPage.Surface;
