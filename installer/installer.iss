@@ -87,7 +87,12 @@ var
   BackupEnabled: TNewCheckBox;
   BackupDrive: TNewCheckBox;
   // Main processes page
-  ProcPage: TInputOptionQueryWizardPage;
+  ProcPage: TNewWizardPage;
+  ProcDocCheck: TNewCheckBox;
+  ProcAnulCheck: TNewCheckBox;
+  ProcNcrediCheck: TNewCheckBox;
+  ProcNventasCheck: TNewCheckBox;
+  ProcGuiaCheck: TNewCheckBox;
   // Options page
   OptPage: TInputQueryWizardPage;
   DebugCheck: TNewCheckBox;
@@ -142,20 +147,49 @@ begin
   BackupDrive.Checked := False;
 
   // === Page 3: Processes ===
-  ProcPage := CreateInputOptionQueryPage(BackupPage.ID,
+  ProcPage := CreateCustomPage(BackupPage.ID,
     'Procesos Habilitados',
-    'Seleccione qué procesos ejecutar en cada ciclo',
-    'Solo los procesos marcados se ejecutarán automáticamente.');
-  ProcPage.Add('Enviar facturas/boletas (M_DOC)');
-  ProcPage.Add('Enviar anulaciones (M_ANUL)');
-  ProcPage.Add('Enviar notas de crédito (M_NCREDI)');
-  ProcPage.Add('Enviar notas de venta (M_NVENTAS)');
-  ProcPage.Add('Enviar guías de remisión (M_GUIA)');
-  ProcPage.Values[0] := True;
-  ProcPage.Values[1] := False;
-  ProcPage.Values[2] := False;
-  ProcPage.Values[3] := False;
-  ProcPage.Values[4] := False;
+    'Seleccione qué procesos ejecutar en cada ciclo');
+
+  ProcDocCheck := TNewCheckBox.Create(ProcPage.Surface);
+  ProcDocCheck.Parent := ProcPage.Surface;
+  ProcDocCheck.Left := ScaleX(20);
+  ProcDocCheck.Top := ScaleY(10);
+  ProcDocCheck.Width := ScaleX(400);
+  ProcDocCheck.Caption := 'Enviar facturas/boletas (M_DOC)';
+  ProcDocCheck.Checked := True;
+
+  ProcAnulCheck := TNewCheckBox.Create(ProcPage.Surface);
+  ProcAnulCheck.Parent := ProcPage.Surface;
+  ProcAnulCheck.Left := ScaleX(20);
+  ProcAnulCheck.Top := ProcDocCheck.Top + ScaleY(25);
+  ProcAnulCheck.Width := ScaleX(400);
+  ProcAnulCheck.Caption := 'Enviar anulaciones (M_ANUL)';
+  ProcAnulCheck.Checked := False;
+
+  ProcNcrediCheck := TNewCheckBox.Create(ProcPage.Surface);
+  ProcNcrediCheck.Parent := ProcPage.Surface;
+  ProcNcrediCheck.Left := ScaleX(20);
+  ProcNcrediCheck.Top := ProcAnulCheck.Top + ScaleY(25);
+  ProcNcrediCheck.Width := ScaleX(400);
+  ProcNcrediCheck.Caption := 'Enviar notas de crédito (M_NCREDI)';
+  ProcNcrediCheck.Checked := False;
+
+  ProcNventasCheck := TNewCheckBox.Create(ProcPage.Surface);
+  ProcNventasCheck.Parent := ProcPage.Surface;
+  ProcNventasCheck.Left := ScaleX(20);
+  ProcNventasCheck.Top := ProcNcrediCheck.Top + ScaleY(25);
+  ProcNventasCheck.Width := ScaleX(400);
+  ProcNventasCheck.Caption := 'Enviar notas de venta (M_NVENTAS)';
+  ProcNventasCheck.Checked := False;
+
+  ProcGuiaCheck := TNewCheckBox.Create(ProcPage.Surface);
+  ProcGuiaCheck.Parent := ProcPage.Surface;
+  ProcGuiaCheck.Left := ScaleX(20);
+  ProcGuiaCheck.Top := ProcNventasCheck.Top + ScaleY(25);
+  ProcGuiaCheck.Width := ScaleX(400);
+  ProcGuiaCheck.Caption := 'Enviar guías de remisión (M_GUIA)';
+  ProcGuiaCheck.Checked := False;
 
   // === Page 4: Options ===
   OptPage := CreateInputQueryPage(ProcPage.ID,
@@ -243,11 +277,11 @@ begin
     Lines[15] := 'BU_TIME2 = ' + BackupPage.Values[2];
     Lines[16] := '';
     Lines[17] := '[MAIN]';
-    Lines[18] := 'M_DOC = ' + BoolToStr(ProcPage.Values[0]);
-    Lines[19] := 'M_ANUL = ' + BoolToStr(ProcPage.Values[1]);
-    Lines[20] := 'M_NCREDI = ' + BoolToStr(ProcPage.Values[2]);
-    Lines[21] := 'M_NVENTAS = ' + BoolToStr(ProcPage.Values[3]);
-    Lines[22] := 'M_GUIA = ' + BoolToStr(ProcPage.Values[4]);
+    Lines[18] := 'M_DOC = ' + BoolToStr(ProcDocCheck.Checked);
+    Lines[19] := 'M_ANUL = ' + BoolToStr(ProcAnulCheck.Checked);
+    Lines[20] := 'M_NCREDI = ' + BoolToStr(ProcNcrediCheck.Checked);
+    Lines[21] := 'M_NVENTAS = ' + BoolToStr(ProcNventasCheck.Checked);
+    Lines[22] := 'M_GUIA = ' + BoolToStr(ProcGuiaCheck.Checked);
     Lines[23] := '';
     Lines[24] := '[MODELS]';
     Lines[25] := 'DATE_HEADER = ' + OptPage.Values[0];
