@@ -62,7 +62,7 @@ Filename: "{app}\nssm.exe"; Parameters: "set {#MyServiceName} AppStderr ""{app}\
 Filename: "{app}\nssm.exe"; Parameters: "set {#MyServiceName} AppRotateFiles 1"; Flags: runhidden
 Filename: "{app}\nssm.exe"; Parameters: "set {#MyServiceName} AppRotateBytes 5242880"; Flags: runhidden
 ; Start the service (only if checkbox is checked)
-Filename: "{app}\nssm.exe"; Parameters: "start {#MyServiceName}"; StatusMsg: "Iniciando servicio..."; Flags: runhidden; Check: StartServiceCheck.Checked
+Filename: "{app}\nssm.exe"; Parameters: "start {#MyServiceName}"; StatusMsg: "Iniciando servicio..."; Flags: runhidden; Check: ShouldStartService
 ; Create scheduled task for auto-updater (every 6 hours)
 Filename: "schtasks.exe"; Parameters: "/Create /TN ""{#MyUpdaterTaskName}"" /TR ""\22{app}\{#MyUpdaterExeName}\22"" /SC HOURLY /MO 6 /RU SYSTEM /F"; StatusMsg: "Configurando actualizador automatico..."; Flags: runhidden
 
@@ -189,6 +189,11 @@ begin
   StartServiceCheck.Width := ScaleX(400);
   StartServiceCheck.Caption := 'Iniciar servicio FaqtureServicio ahora';
   StartServiceCheck.Checked := True;
+end;
+
+function ShouldStartService: Boolean;
+begin
+  Result := StartServiceCheck.Checked;
 end;
 
 function NextButtonClick(CurPageID: Integer): Boolean;
