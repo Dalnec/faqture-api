@@ -1,6 +1,13 @@
 import logging
 import os
+import sys
 from logging.handlers import RotatingFileHandler
+
+try:
+    import colorama
+    colorama.init()
+except ImportError:
+    pass
 
 
 # ANSI color codes for console output

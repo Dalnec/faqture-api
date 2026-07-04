@@ -359,7 +359,14 @@ En consola se muestran con colores ANSI.
    git tag v1.3.0
    git push origin v1.3.0
    ```
-3. GitHub Actions ejecuta automáticamente el workflow `build-release.yml`:
+3. Si el tag ya existe, eliminarlo y recrearlo:
+   ```bash
+   git tag -d v1.3.0
+   git push origin :refs/tags/v1.3.0
+   git tag v1.3.0
+   git push origin v1.3.0
+   ```
+4. GitHub Actions ejecuta automáticamente el workflow `build-release.yml`:
    - Compila `faqture.exe` y `updater.exe` con PyInstaller
    - Descarga NSSM 2.24
    - Compila el instalador con Inno Setup
