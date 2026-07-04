@@ -59,8 +59,9 @@ class ApiClient:
                     update_success(item, doc_id, message, data)
                     log.info(f'[{process_name}] id={doc_id} {doc_ref} -> PROCESADO ({elapsed}ms)')
                 else:
-                    update_error(item, doc_id, data['message'], data)
-                    log.error(f'[{process_name}] id={doc_id} {doc_ref} -> Error: {data["message"]} ({elapsed}ms)')
+                    error_msg = data.get('message', data.get('error', data.get('detail', str(data))))
+                    update_error(item, doc_id, error_msg, data)
+                    log.error(f'[{process_name}] id={doc_id} {doc_ref} -> Error: {error_msg} ({elapsed}ms)')
 
             except requests.ConnectionError as e:
                 log.warning(f'[{process_name}] id={doc_id} {doc_ref} -> ConnectionError: {e}')
