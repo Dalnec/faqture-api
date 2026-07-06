@@ -139,11 +139,15 @@ def main():
 
     init_pool()
 
+    from api.api import config_poller
+
     try:
         processor = ProcessManager(config, log)
 
         while running:
-            processor.run_cycle()
+            config_poller.sync(config.poll_interval)
+            if not config_poller.paused:
+                processor.run_cycle()
             time.sleep(0.5)
 
     except Exception as e:
@@ -170,10 +174,13 @@ def main_gui():
     init_pool()
 
     def processing_loop():
+        from api.api import config_poller
         try:
             processor = ProcessManager(config, log)
             while running:
-                processor.run_cycle()
+                config_poller.sync(config.poll_interval)
+                if not config_poller.paused:
+                    processor.run_cycle()
                 time.sleep(0.5)
         except Exception as e:
             log.error(f"Error critico: {e}", exc_info=True)

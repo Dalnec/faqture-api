@@ -4,7 +4,7 @@ from dataclasses import dataclass
 
 @dataclass
 class Config:
-    """Configuración de la aplicación"""
+    """Configuracion de la aplicacion"""
     db_name: str
     db_user: str
     db_pass: str
@@ -23,6 +23,9 @@ class Config:
     date_header: str
     debug: bool
     api_ssl_verify: bool
+    backend_url: str
+    poll_interval: int
+    client_name: str
 
 def load_config() -> Config:
     """Cargar configuración desde archivo"""
@@ -51,6 +54,9 @@ def load_config() -> Config:
         date_header=config['MODELS']['DATE_HEADER'],
         debug=config.getboolean('APP', 'DEBUG', fallback=False),
         api_ssl_verify=config.getboolean('API', 'SSL_VERIFY', fallback=False),
+        backend_url=config.get('BACKEND', 'BACKEND_URL', fallback=''),
+        poll_interval=config.getint('BACKEND', 'POLL_INTERVAL', fallback=43200),
+        client_name=config.get('CLIENT', 'CLIENT_NAME', fallback=''),
     )
 
 # Cargar config global al importar el módulo

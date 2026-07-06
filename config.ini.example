@@ -30,3 +30,10 @@ DEBUG = False
 
 [API]
 SSL_VERIFY = False
+
+[BACKEND]
+BACKEND_URL = https://your-faqture-back-url.com
+POLL_INTERVAL = 43200
+
+[CLIENT]
+CLIENT_NAME = Nombre descriptivo del cliente

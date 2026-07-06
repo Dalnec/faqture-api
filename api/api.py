@@ -1,6 +1,7 @@
 import requests
 import json
 import time as _time
+import threading
 
 from base.comercial.db import (
     read_empresa_pgsql, update_no_200, update_venta_pgsql,
@@ -9,6 +10,7 @@ from base.comercial.db import (
 )
 from logger import get_logger
 from config import CONFIG
+from client_id import get_client_id
 from urllib3.exceptions import InsecureRequestWarning
 
 if not CONFIG.api_ssl_verify:
@@ -16,6 +18,75 @@ if not CONFIG.api_ssl_verify:
 
 log = get_logger()
 DEBUG = CONFIG.debug
+CLIENT_ID = get_client_id()
+
+
+class ErrorReporter:
+    def __init__(self, back_url):
+        self.back_url = back_url
+
+    def report(self, error_type, document_ref, error_message):
+        if not self.back_url:
+            return
+        try:
+            requests.post(f'{self.back_url}/api/faqture-errors', json={
+                'client_id': CLIENT_ID,
+                'client_name': CONFIG.client_name,
+                'error_type': error_type,
+                'document_ref': document_ref,
+                'error_message': error_message,
+            }, timeout=5)
+        except Exception:
+            pass
+
+
+class ConfigPoller:
+    def __init__(self, back_url):
+        self.back_url = back_url
+        self.paused = False
+        self._last_poll = 0
+
+    def sync(self, interval):
+        if not self.back_url:
+            return
+        now = _time.time()
+        if now - self._last_poll < interval:
+            return
+        self._last_poll = now
+        try:
+            res = requests.get(f'{self.back_url}/api/faqture-config', params={
+                'client_id': CLIENT_ID
+            }, timeout=5)
+            self.paused = res.json().get('paused', False)
+        except Exception:
+            pass
+        try:
+            res = requests.get(f'{self.back_url}/api/config-updates/pending', params={
+                'client_id': CLIENT_ID
+            }, timeout=5)
+            for update in res.json().get('updates', []):
+                self._apply_to_kenani(update)
+                requests.put(f'{self.back_url}/api/config-updates/{update["id"]}/apply', timeout=5)
+        except Exception:
+            pass
+
+    def _apply_to_kenani(self, update):
+        from base.comercial.db import get_connection
+        try:
+            with get_connection() as cnx:
+                with cnx.cursor() as cursor:
+                    cursor.execute(
+                        "UPDATE comercial.empresa SET efactur_empresa=%s, efactur_url=%s WHERE id_empresa=1",
+                        (update['new_token'], update['new_url'])
+                    )
+                cnx.commit()
+            log.info('[CONFIG] Credenciales actualizadas en Kenani DB')
+        except Exception as e:
+            log.error(f'[CONFIG] Error actualizando credenciales: {e}')
+
+
+reporter = ErrorReporter(CONFIG.backend_url)
+config_poller = ConfigPoller(CONFIG.backend_url)
 
 
 class ApiClient:
@@ -62,15 +133,23 @@ class ApiClient:
                     error_msg = data.get('message', data.get('error', data.get('detail', str(data))))
                     update_error(item, doc_id, error_msg, data)
                     log.error(f'[{process_name}] id={doc_id} {doc_ref} -> Error: {error_msg} ({elapsed}ms)')
+                    if res.status_code in (401, 403) or 'credential' in error_msg.lower():
+                        reporter.report('credential', str(doc_ref), error_msg)
+                    else:
+                        reporter.report('rejection', str(doc_ref), error_msg)
 
             except requests.ConnectionError as e:
                 log.warning(f'[{process_name}] id={doc_id} {doc_ref} -> ConnectionError: {e}')
+                reporter.report('connection', str(doc_ref), str(e))
             except requests.Timeout as e:
                 log.warning(f'[{process_name}] id={doc_id} {doc_ref} -> Timeout: {e}')
+                reporter.report('connection', str(doc_ref), str(e))
             except requests.HTTPError as e:
                 log.warning(f'[{process_name}] id={doc_id} {doc_ref} -> HTTPError: {e}')
+                reporter.report('connection', str(doc_ref), str(e))
             except requests.RequestException as e:
                 log.warning(f'[{process_name}] id={doc_id} {doc_ref} -> RequestException: {e}')
+                reporter.report('connection', str(doc_ref), str(e))
 
     def _send_cpe(self, ventas):
         def on_success(venta, doc_id, message, data):
