@@ -160,4 +160,3 @@ service.log
 
 # Installer build output
 installer/dist/
-installer/bin/nssm.exe

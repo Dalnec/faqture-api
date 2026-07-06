@@ -51,16 +51,6 @@ jobs:
         run: |
           uv run pyinstaller --onefile --console --name updater updater/updater.py
 
-      - name: Download NSSM 2.24
-        shell: pwsh
-        run: |
-          $url = "https://nssm.cc/release/nssm-2.24.zip"
-          $zip = "$env:TEMP\nssm.zip"
-          Invoke-WebRequest -Uri $url -OutFile $zip
-          Expand-Archive -Path $zip -DestinationPath "$env:TEMP\nssm" -Force
-          Copy-Item "$env:TEMP\nssm\nssm-2.24\win64\nssm.exe" -Destination "installer\bin\nssm.exe"
-          Write-Host "NSSM downloaded successfully"
-
       - name: Generate version.txt
         shell: bash
         run: |
