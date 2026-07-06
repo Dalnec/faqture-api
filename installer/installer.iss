@@ -56,6 +56,7 @@ Name: "{app}\logs"; Permissions: users-modify
 ; Install Faqture service via NSSM
 Filename: "{app}\nssm.exe"; Parameters: "install {#MyServiceName} ""{app}\{#MyAppExeName}"""; StatusMsg: "Instalando servicio..."; Flags: runhidden
 Filename: "{app}\nssm.exe"; Parameters: "set {#MyServiceName} AppDirectory ""{app}"""; Flags: runhidden
+Filename: "{app}\nssm.exe"; Parameters: "set {#MyServiceName} AppParameters ""--gui"""; Flags: runhidden
 Filename: "{app}\nssm.exe"; Parameters: "set {#MyServiceName} Start SERVICE_AUTO_START"; Flags: runhidden
 Filename: "{app}\nssm.exe"; Parameters: "set {#MyServiceName} AppStdout ""{app}\service.log"""; Flags: runhidden
 Filename: "{app}\nssm.exe"; Parameters: "set {#MyServiceName} AppStderr ""{app}\service.log"""; Flags: runhidden
@@ -114,9 +115,9 @@ begin
   DBPage.Add('Contraseña (DB_PASS):', True);
   DBPage.Values[0] := '127.0.0.1';
   DBPage.Values[1] := '5432';
-  DBPage.Values[2] := '';
-  DBPage.Values[3] := 'postgres';
-  DBPage.Values[4] := '';
+  DBPage.Values[2] := 'BD_Comercial';
+  DBPage.Values[3] := 'comercial';
+  DBPage.Values[4] := 'comercial';
 
   // === Page 2: Backup ===
   BackupPage := CreateInputQueryPage(DBPage.ID,

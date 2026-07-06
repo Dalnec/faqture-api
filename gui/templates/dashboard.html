@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+{% block title %}Dashboard{% endblock %}
+{% block content %}
+<div class="card">
+    <h2>Estado del Sistema</h2>
+    <div class="status-grid">
+        <div class="status-item">
+            <div class="dot {{ 'ok' if db_status else 'error' }}"></div>
+            <span>Base de Datos</span>
+        </div>
+        <div class="status-item">
+            <div class="dot {{ 'ok' if api_status else 'error' }}"></div>
+            <span>API Externa</span>
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <h2>Documentos</h2>
+    <div class="stats-grid">
+        <div class="stat">
+            <div class="number">{{ stats.get('total', 0) }}</div>
+            <div class="label">Total</div>
+        </div>
+        <div class="stat">
+            <div class="number">{{ stats.get('PENDIENTE', 0) }}</div>
+            <div class="label">Pendientes</div>
+        </div>
+        <div class="stat">
+            <div class="number">{{ stats.get('PROCESADO', 0) }}</div>
+            <div class="label">Procesados</div>
+        </div>
+        <div class="stat">
+            <div class="number">{{ stats.get('ERROR', 0) }}</div>
+            <div class="label">Errores</div>
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <h2>Empresa</h2>
+    {% if empresa %}
+    <div class="info-row">
+        <span class="info-label">Token</span>
+        <span class="info-value">{{ empresa[0][:20] }}...</span>
+    </div>
+    <div class="info-row">
+        <span class="info-label">URL</span>
+        <span class="info-value">{{ empresa[1] }}</span>
+    </div>
+    {% if empresa[2] %}
+    <div class="info-row">
+        <span class="info-label">Direccion</span>
+        <span class="info-value">{{ empresa[2] }}</span>
+    </div>
+    {% endif %}
+    {% else %}
+    <p style="color:#888;font-size:13px;">No se pudo cargar la informacion de la empresa.</p>
+    {% endif %}
+    <div style="margin-top:12px;">
+        <a href="/empresa" class="btn btn-primary">Editar Configuracion</a>
+    </div>
+</div>
+{% endblock %}

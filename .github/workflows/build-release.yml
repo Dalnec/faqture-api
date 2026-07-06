@@ -45,7 +45,7 @@ jobs:
 
       - name: Build faqture.exe
         run: |
-          uv run pyinstaller --onefile --console --name faqture main.py
+          uv run pyinstaller Faqture.spec
 
       - name: Build updater.exe
         run: |

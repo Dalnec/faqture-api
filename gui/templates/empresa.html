@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block title %}Configuracion - Empresa{% endblock %}
+{% block content %}
+<div class="card">
+    <h2>Configuracion de Empresa</h2>
+    <p style="color:#888;font-size:13px;margin-bottom:16px;">
+        Configure los datos de conexion al API de eFactur (SUNAT).
+    </p>
+
+    {% if saved %}
+    <div class="alert alert-success">Configuracion guardada correctamente.</div>
+    {% endif %}
+    {% if error is defined and error %}
+    <div class="alert alert-error">{{ error }}</div>
+    {% endif %}
+
+    <form method="POST" action="/empresa">
+        <label>
+            Token de Autenticacion (efactur_empresa)
+            <input type="text" name="efactur_empresa" value="{{ empresa[0] if empresa else '' }}" required>
+        </label>
+        <label>
+            URL del API (efactur_url)
+            <input type="text" name="efactur_url" value="{{ empresa[1] if empresa else '' }}" required>
+        </label>
+        <div style="margin-top:16px;">
+            <button type="submit" class="btn btn-primary">Guardar Cambios</button>
+            <a href="/" style="margin-left:8px;color:#888;text-decoration:none;font-size:14px;">Cancelar</a>
+        </div>
+    </form>
+</div>
+
+<div class="card">
+    <h2>Informacion Actual</h2>
+    {% if empresa %}
+    <div class="info-row">
+        <span class="info-label">Direccion</span>
+        <span class="info-value">{{ empresa[2] or 'N/A' }}</span>
+    </div>
+    <div class="info-row">
+        <span class="info-label">Telefono</span>
+        <span class="info-value">{{ empresa[3] or 'N/A' }}</span>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

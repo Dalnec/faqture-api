@@ -154,5 +154,42 @@ def main():
         log.info("Servicio detenido correctamente")
 
 
+def main_gui():
+    import threading
+    from gui.tray import run_tray
+    from gui.dashboard import set_status
+    from base.comercial.db import check_connection
+
+    config = CONFIG
+    setup_logger(debug=config.debug)
+
+    show_banner()
+    log.info(f"Version {APP_INFO['version']} | Build {APP_INFO['build_date']} | Branch {APP_INFO['source_branch']}")
+    log.info("Iniciando en modo GUI...")
+
+    init_pool()
+
+    def processing_loop():
+        try:
+            processor = ProcessManager(config, log)
+            while running:
+                processor.run_cycle()
+                time.sleep(0.5)
+        except Exception as e:
+            log.error(f"Error critico: {e}", exc_info=True)
+
+    threading.Thread(target=processing_loop, daemon=True).start()
+
+    try:
+        run_tray()
+    except Exception as e:
+        log.error(f"Error en GUI: {e}", exc_info=True)
+    finally:
+        close_pool()
+
+
 if __name__ == "__main__":
-    main()
+    if "--gui" in sys.argv:
+        main_gui()
+    else:
+        main()

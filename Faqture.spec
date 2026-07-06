@@ -7,6 +7,8 @@ added_files = [
     ('models', 'models'),
     ('base', 'base'),
     ('api', 'api'),
+    ('gui/templates', 'gui/templates'),
+    ('logo.ico', '.'),
 ]
 
 a = Analysis(
@@ -17,9 +19,19 @@ a = Analysis(
     hiddenimports=[
         'psycopg2',
         'psycopg2._psycopg',
+        'psycopg2.pool',
         'configparser',
         'logging.handlers',
         'json',
+        'colorama',
+        'flask',
+        'flask.json',
+        'jinja2',
+        'markupsafe',
+        'werkzeug',
+        'werkzeug.serving',
+        'pystray._win32',
+        'PIL',
         'google-api-python-client',
     ],
     hookspath=[],

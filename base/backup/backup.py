@@ -2,6 +2,7 @@ import gzip
 import os
 import shutil
 import subprocess
+import threading
 from datetime import datetime
 from pathlib import Path
 from base.backup.send_drive import DriveClient
@@ -15,13 +16,15 @@ COMPRESSED_FILE = Path(f"{BACKUP_FILE}.gz")
 DRIVE_ENABLED = CONFIG.db_drive
 
 _drive_client = None
+_drive_lock = threading.Lock()
 
 
 def _get_drive_client():
     global _drive_client
-    if _drive_client is None:
-        _drive_client = DriveClient()
-    return _drive_client
+    with _drive_lock:
+        if _drive_client is None:
+            _drive_client = DriveClient()
+        return _drive_client
 
 
 def backup():
