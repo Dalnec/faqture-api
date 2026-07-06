@@ -103,10 +103,10 @@ def run_tray():
     from gui.dashboard import set_status
     from base.comercial.db import check_connection
 
-    def _is_web_running():
+    def _is_web_running(item):
         return _web_running
 
-    def _is_web_stopped():
+    def _is_web_stopped(item):
         return not _web_running
 
     icon = pystray.Icon(
