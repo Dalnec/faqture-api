@@ -152,6 +152,7 @@ logs.log
 format.json
 format1.json
 *.exe
+!installer/bin/nssm.exe
 requirements_backup.txt
 
 # Updater / Service logs
