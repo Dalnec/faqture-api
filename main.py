@@ -161,7 +161,7 @@ def main_gui():
     from base.comercial.db import check_connection
 
     config = CONFIG
-    setup_logger(debug=config.debug)
+    log = setup_logger(debug=config.debug)
 
     show_banner()
     log.info(f"Version {APP_INFO['version']} | Build {APP_INFO['build_date']} | Branch {APP_INFO['source_branch']}")
