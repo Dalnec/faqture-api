@@ -1,0 +1,176 @@
+{% extends "base.html" %}
+{% block title %}Detalle Documento{% endblock %}
+{% block content %}
+<div class="card" id="docDetail">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+        <h2 style="margin:0;" id="detailTitle">Detalle del Documento</h2>
+        <a href="/documents" style="color:#888;text-decoration:none;font-size:13px;">&larr; Volver a lista</a>
+    </div>
+
+    <div id="detailContent" style="color:#888;">Cargando...</div>
+</div>
+
+<style>
+    .detail-grid { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:20px; }
+    .detail-item { padding:10px; background:#f8f9fa; border-radius:6px; }
+    .detail-label { font-size:11px; color:#888; text-transform:uppercase; margin-bottom:4px; }
+    .detail-value { font-size:14px; font-weight:500; color:#333; }
+    .detail-section { margin-top:20px; }
+    .detail-section h3 { font-size:14px; color:#555; margin-bottom:8px; border-bottom:1px solid #eee; padding-bottom:6px; }
+    .json-block { background:#1a1a2e; color:#e2e8f0; padding:14px; border-radius:6px; font-size:12px; overflow-x:auto; white-space:pre-wrap; word-break:break-word; max-height:400px; overflow-y:auto; }
+    .action-bar { display:flex; gap:8px; margin-top:16px; padding-top:12px; border-top:1px solid #eee; }
+    .btn { padding:8px 16px; border-radius:6px; border:none; cursor:pointer; font-size:13px; }
+    .btn-primary { background:#1a1a2e; color:white; }
+    .btn-primary:hover { background:#16213e; }
+    .btn-danger { background:#ef4444; color:white; }
+    .btn-danger:hover { background:#dc2626; }
+    .btn-secondary { background:#e5e7eb; color:#374151; }
+    .btn-secondary:hover { background:#d1d5db; }
+    .status-edit { display:inline-flex; align-items:center; gap:6px; }
+    .status-edit select { padding:4px 8px; border:1px solid #ddd; border-radius:4px; font-size:12px; }
+</style>
+
+<script>
+const DOC_TYPE = '{{ doc_type }}';
+const DOC_ID = '{{ doc_id }}';
+
+function loadDetail() {
+    fetch(`/api/documents/${DOC_TYPE}/${DOC_ID}/payload`)
+        .then(r => r.json())
+        .then(data => {
+            if (data.error) {
+                document.getElementById('detailContent').innerHTML = `<p style="color:#ef4444;">${data.error}</p>`;
+                return;
+            }
+            renderDetail(data);
+        })
+        .catch(e => {
+            document.getElementById('detailContent').innerHTML = `<p style="color:#ef4444;">Error cargando documento</p>`;
+        });
+}
+
+function renderDetail(data) {
+    const payload = data.payload;
+    const response = data.response;
+    const header = payload.header || {};
+    const details = payload.details || [];
+
+    const serie = header.num_serie || header.serie || '';
+    const numero = header.num_documento || header.numero || '';
+    document.getElementById('detailTitle').textContent = `Detalle: ${serie}-${numero}`;
+
+    let html = '<div class="detail-grid">';
+
+    if (DOC_TYPE === 'ventas') {
+        html += detailItem('ID', header.id_venta);
+        html += detailItem('Serie', header.num_serie);
+        html += detailItem('Numero', header.num_documento);
+        html += detailItem('Fecha', header.fecha_hora);
+        html += detailItem('Tipo Doc', header.codigo_sunat);
+        html += detailItem('RUC', header.ruc);
+        html += detailItem('Cliente', header.nombres_cliente);
+        html += detailItem('Direccion', header.direccion);
+        html += detailItem('Monto', 'S/. ' + parseFloat(header.monto_venta || 0).toFixed(2));
+        html += detailItem('IGV', 'S/. ' + parseFloat(header.igv || 0).toFixed(2));
+        html += detailItem('Estado', header.estado_declaracion);
+        html += detailItem('External ID', header.external_id || 'N/A');
+    } else if (DOC_TYPE === 'notas_credito') {
+        html += detailItem('ID', header.id_notas_credito_debito);
+        html += detailItem('Serie', header.serie);
+        html += detailItem('Numero', header.numero);
+        html += detailItem('Fecha', header.fecha);
+        html += detailItem('Motivo', header.motivo);
+        html += detailItem('Persona', header.persona);
+        html += detailItem('Serie Ref', header.serie_ref);
+        html += detailItem('Numero Ref', header.numero_ref);
+        html += detailItem('Estado', header.estado_declaracion);
+    } else if (DOC_TYPE === 'guias') {
+        html += detailItem('ID', header.id_guia);
+        html += detailItem('Serie', header.num_serie);
+        html += detailItem('Numero', header.num_documento);
+        html += detailItem('Fecha', header.fecha_hora);
+        html += detailItem('Tipo Doc', header.codigo_sunat);
+        html += detailItem('Destinatario', header.nombres_cliente);
+        html += detailItem('Direccion Destino', header.direccion_cliente);
+        html += detailItem('Transportista', header.transporte);
+        html += detailItem('RUC Transportista', header.ructrasnporte);
+        html += detailItem('Placa', header.placa);
+        html += detailItem('Chofer', header.chofer);
+        html += detailItem('Estado', header.estado_declaracion);
+    }
+    html += '</div>';
+
+    if (details.length > 0) {
+        html += '<div class="detail-section"><h3>Detalle Items</h3>';
+        html += '<table class="doc-table" style="width:100%;font-size:12px;"><thead><tr>';
+        html += '<th>Codigo</th><th>Descripcion</th><th>Cantidad</th><th>Precio</th>';
+        html += '</tr></thead><tbody>';
+        details.forEach(d => {
+            html += `<tr><td>${d.codigo_producto || ''}</td><td>${d.descripcion || ''}</td>`;
+            html += `<td>${d.cantidad || ''}</td><td>S/. ${parseFloat(d.monto || d.precio_unitario || 0).toFixed(2)}</td></tr>`;
+        });
+        html += '</tbody></table></div>';
+    }
+
+    html += '<div class="detail-section"><h3>Payload JSON (enviado a SUNAT)</h3>';
+    html += `<pre class="json-block">${JSON.stringify(header, null, 2)}</pre></div>`;
+
+    if (response && Object.keys(response).length > 0) {
+        html += '<div class="detail-section"><h3>Respuesta Recibida</h3>';
+        html += `<pre class="json-block">${JSON.stringify(response, null, 2)}</pre></div>`;
+    }
+
+    html += `<div class="action-bar">`;
+    html += `<button class="btn btn-primary" onclick="resendDoc()">Reenviar</button>`;
+    html += `<div class="status-edit"><select id="newEstado">`;
+    ['PENDIENTE', 'PROCESADO', 'ERROR', 'ANULADO', 'NO DECLARAR'].forEach(e => {
+        const sel = header.estado_declaracion === e ? 'selected' : '';
+        html += `<option value="${e}" ${sel}>${e}</option>`;
+    });
+    html += `</select><button class="btn btn-secondary" onclick="updateEstado()">Cambiar Estado</button></div>`;
+    html += `</div>`;
+
+    document.getElementById('detailContent').innerHTML = html;
+}
+
+function detailItem(label, value) {
+    return `<div class="detail-item"><div class="detail-label">${label}</div><div class="detail-value">${value || 'N/A'}</div></div>`;
+}
+
+function resendDoc() {
+    if (!confirm('Reenviar este documento?')) return;
+    fetch(`/api/documents/${DOC_ID}/resend`, { method: 'POST' })
+        .then(r => r.json())
+        .then(data => {
+            if (data.success) {
+                alert('Documento reenviado correctamente');
+                loadDetail();
+            } else {
+                alert('Error: ' + (data.error || 'Desconocido'));
+            }
+        })
+        .catch(e => alert('Error de conexion'));
+}
+
+function updateEstado() {
+    const nuevoEstado = document.getElementById('newEstado').value;
+    fetch(`/api/documents/${DOC_ID}/status`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ estado: nuevoEstado })
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            alert('Estado actualizado');
+            loadDetail();
+        } else {
+            alert('Error: ' + (data.error || 'Desconocido'));
+        }
+    })
+    .catch(e => alert('Error de conexion'));
+}
+
+loadDetail();
+</script>
+{% endblock %}

@@ -3,7 +3,9 @@ from flask import Flask, render_template, request, redirect, url_for, jsonify
 from base.comercial.db import (
     check_connection, read_empresa_full, update_empresa, get_connection,
     read_ventas_list, read_notas_credito_list, read_guias_list, read_anulados_list,
-    update_venta_pgsql
+    update_venta_pgsql, read_venta_payload, read_nota_credito_payload,
+    read_guia_payload, read_venta_by_id,
+    read_empresa_pgsql
 )
 from logger import get_logger
 
@@ -69,35 +71,71 @@ def documents_page():
     )
 
 
+@app.route('/documents/<doc_type>/<int:doc_id>')
+def document_detail_page(doc_type, doc_id):
+    return render_template('document_detail.html', doc_type=doc_type, doc_id=doc_id)
+
+
 @app.route('/api/documents')
 def api_documents():
     doc_type = request.args.get('type', 'ventas')
     estado = request.args.get('estado', None)
     serie = request.args.get('serie', None)
     fecha = request.args.get('fecha', None)
+    page = int(request.args.get('page', 1))
+    per_page = min(int(request.args.get('per_page', 100)), 500)
     try:
         if doc_type == 'ventas':
-            docs = read_ventas_list(estado=estado, serie=serie, fecha=fecha)
+            docs, total = read_ventas_list(estado=estado, serie=serie, fecha=fecha, page=page, per_page=per_page)
         elif doc_type == 'notas_credito':
-            docs = read_notas_credito_list(estado=estado)
+            docs, total = read_notas_credito_list(estado=estado, page=page, per_page=per_page)
         elif doc_type == 'guias':
-            docs = read_guias_list(estado=estado)
+            docs, total = read_guias_list(estado=estado, page=page, per_page=per_page)
         elif doc_type == 'anulados':
-            docs = read_anulados_list()
+            docs, total = read_anulados_list(page=page, per_page=per_page)
         else:
-            docs = []
-        for doc in docs:
-            for k, v in doc.items():
-                if hasattr(v, 'isoformat'):
-                    doc[k] = v.isoformat()
-                elif isinstance(v, (int, float, str, bool, type(None))):
-                    pass
-                else:
-                    doc[k] = str(v)
-        return jsonify({'documents': docs, 'count': len(docs)})
+            docs, total = [], 0
+        total_pages = max(1, (total + per_page - 1) // per_page)
+        return jsonify({
+            'documents': docs,
+            'count': len(docs),
+            'total': total,
+            'page': page,
+            'per_page': per_page,
+            'total_pages': total_pages,
+        })
     except Exception as e:
         log.error(f'[DASHBOARD] Error listando documentos: {e}')
-        return jsonify({'documents': [], 'count': 0, 'error': str(e)})
+        return jsonify({'documents': [], 'count': 0, 'total': 0, 'page': 1, 'per_page': per_page, 'total_pages': 1, 'error': str(e)})
+
+
+@app.route('/api/documents/<doc_type>/<int:doc_id>/payload')
+def api_document_payload(doc_type, doc_id):
+    try:
+        if doc_type == 'ventas':
+            payload = read_venta_payload(doc_id)
+        elif doc_type == 'notas_credito':
+            payload = read_nota_credito_payload(doc_id)
+        elif doc_type == 'guias':
+            payload = read_guia_payload(doc_id)
+        else:
+            return jsonify({'error': 'Tipo no soportado'}), 400
+
+        if not payload:
+            return jsonify({'error': 'Documento no encontrado'}), 404
+
+        doc = read_venta_by_id(doc_id) if doc_type == 'ventas' else None
+        response = {}
+        if doc and doc.get('observaciones_declaracion'):
+            try:
+                response = json.loads(doc['observaciones_declaracion'])
+            except (json.JSONDecodeError, TypeError):
+                response = {'raw': str(doc['observaciones_declaracion'])}
+
+        return jsonify({'payload': payload, 'response': response})
+    except Exception as e:
+        log.error(f'[DASHBOARD] Error obteniendo payload: {e}')
+        return jsonify({'error': str(e)}), 500
 
 
 @app.route('/api/documents/<int:doc_id>/status', methods=['PUT'])
@@ -111,6 +149,34 @@ def api_update_status(doc_id):
         return jsonify({'success': True})
     except Exception as e:
         log.error(f'[DASHBOARD] Error actualizando estado: {e}')
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/documents/<int:doc_id>/resend', methods=['POST'])
+def api_resend_venta(doc_id):
+    try:
+        from api.api import ApiClient
+        from models.comercial.ventas import leer_db_documentos
+        from base.comercial.db import get_connection
+
+        with get_connection() as cnx:
+            with cnx.cursor() as cursor:
+                cursor.execute(
+                    "UPDATE comercial.ventas SET estado_declaracion = 'PENDIENTE' WHERE id_venta = %s",
+                    (doc_id,)
+                )
+            cnx.commit()
+
+        client = ApiClient()
+        ventas = leer_db_documentos()
+        target = [v for v in ventas if v.get('id_venta') == doc_id]
+        if not target:
+            return jsonify({'error': 'Documento no encontrado en cola de envio'}), 404
+
+        client._send_cpe(target)
+        return jsonify({'success': True, 'message': 'Documento enviado'})
+    except Exception as e:
+        log.error(f'[DASHBOARD] Error reenviando documento: {e}')
         return jsonify({'error': str(e)}), 500
 
 

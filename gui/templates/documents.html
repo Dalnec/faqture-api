@@ -22,8 +22,8 @@
 
     <div style="display:flex;gap:0;border-bottom:2px solid #eee;margin-bottom:0;">
         <button class="tab-btn {{ 'active' if tab == 'ventas' }}" onclick="switchTab('ventas')">Facturas/Boletas</button>
-        <button class="tab-btn {{ 'active' if tab == 'notas_credito' }}" onclick="switchTab('notas_credito')">Notas Crédito</button>
-        <button class="tab-btn {{ 'active' if tab == 'guias' }}" onclick="switchTab('guias')">Guías</button>
+        <button class="tab-btn {{ 'active' if tab == 'notas_credito' }}" onclick="switchTab('notas_credito')">Notas Credito</button>
+        <button class="tab-btn {{ 'active' if tab == 'guias' }}" onclick="switchTab('guias')">Guias</button>
         <button class="tab-btn {{ 'active' if tab == 'anulados' }}" onclick="switchTab('anulados')">Anulados</button>
     </div>
 
@@ -35,7 +35,14 @@
             </tbody>
         </table>
     </div>
-    <div id="docCount" style="padding:8px 12px;font-size:12px;color:#888;border-top:1px solid #eee;"></div>
+    <div id="pagination" style="display:flex;justify-content:space-between;align-items:center;padding:10px 12px;font-size:12px;color:#888;border-top:1px solid #eee;">
+        <span id="docCount"></span>
+        <div style="display:flex;gap:4px;">
+            <button class="page-btn" onclick="goPage(currentPage-1)" id="btnPrev">&laquo; Anterior</button>
+            <span id="pageInfo" style="padding:4px 10px;"></span>
+            <button class="page-btn" onclick="goPage(currentPage+1)" id="btnNext">Siguiente &raquo;</button>
+        </div>
+    </div>
 </div>
 
 <div id="previewModal" class="modal-overlay" style="display:none;" onclick="closePreview(event)">
@@ -61,7 +68,8 @@
     .doc-table th { text-align:left; padding:8px 10px; background:#f8f9fa; color:#555; font-weight:600; border-bottom:1px solid #eee; white-space:nowrap; }
     .doc-table td { padding:7px 10px; border-bottom:1px solid #f0f0f0; }
     .doc-table tr:hover { background:#f8f9fa; }
-    .badge { display:inline-block; padding:2px 8px; border-radius:10px; font-size:11px; font-weight:600; }
+    .badge { display:inline-block; padding:2px 8px; border-radius:10px; font-size:11px; font-weight:600; cursor:pointer; }
+    .badge:hover { opacity:0.8; }
     .badge-pendiente { background:#fef3c7; color:#92400e; }
     .badge-procesado { background:#d1fae5; color:#065f46; }
     .badge-error { background:#fee2e2; color:#991b1b; }
@@ -72,16 +80,25 @@
     .action-btn:hover { background:#f3f4f6; border-color:#bbb; }
     .action-btn.primary { background:#1a1a2e; color:white; border-color:#1a1a2e; }
     .action-btn.primary:hover { background:#16213e; }
+    .action-btn.danger { background:#fee2e2; color:#991b1b; border-color:#fca5a5; }
+    .action-btn.danger:hover { background:#fecaca; }
     .modal-overlay { position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.5); z-index:1000; display:flex; align-items:center; justify-content:center; }
     .modal-content { background:white; border-radius:8px; padding:20px; width:90%; max-width:700px; max-height:80vh; overflow-y:auto; }
     .json-preview { background:#1a1a2e; color:#e2e8f0; padding:14px; border-radius:6px; font-size:12px; overflow-x:auto; white-space:pre-wrap; word-break:break-word; max-height:50vh; overflow-y:auto; }
+    .page-btn { padding:4px 10px; border:1px solid #ddd; border-radius:4px; background:white; cursor:pointer; font-size:12px; color:#555; }
+    .page-btn:hover { background:#f3f4f6; }
+    .page-btn:disabled { opacity:0.4; cursor:not-allowed; }
+    .status-dropdown { padding:2px 6px; border:1px solid #ddd; border-radius:4px; font-size:11px; }
 </style>
 
 <script>
 let currentTab = '{{ tab or "ventas" }}';
+let currentPage = 1;
+let totalPages = 1;
 
 function switchTab(tab) {
     currentTab = tab;
+    currentPage = 1;
     document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
     event.target.classList.add('active');
     loadDocs();
@@ -91,7 +108,7 @@ function loadDocs() {
     const estado = document.getElementById('filterEstado').value;
     const serie = document.getElementById('filterSerie').value;
     const fecha = document.getElementById('filterFecha').value;
-    const params = new URLSearchParams({type: currentTab});
+    const params = new URLSearchParams({type: currentTab, page: currentPage, per_page: 100});
     if (estado) params.set('estado', estado);
     if (serie) params.set('serie', serie);
     if (fecha) params.set('fecha', fecha);
@@ -100,11 +117,22 @@ function loadDocs() {
         .then(r => r.json())
         .then(data => {
             renderTable(data.documents);
-            document.getElementById('docCount').textContent = data.count + ' documentos encontrados';
+            totalPages = data.total_pages;
+            currentPage = data.page;
+            document.getElementById('docCount').textContent = `${data.total} documentos total, mostrando ${data.count}`;
+            document.getElementById('pageInfo').textContent = `Pagina ${data.page} de ${data.total_pages}`;
+            document.getElementById('btnPrev').disabled = data.page <= 1;
+            document.getElementById('btnNext').disabled = data.page >= data.total_pages;
         })
         .catch(() => {
             document.getElementById('tableBody').innerHTML = '<tr><td colspan="10" style="text-align:center;color:#ef4444;">Error cargando datos</td></tr>';
         });
+}
+
+function goPage(page) {
+    if (page < 1 || page > totalPages) return;
+    currentPage = page;
+    loadDocs();
 }
 
 function renderTable(docs) {
@@ -120,8 +148,9 @@ function renderTable(docs) {
     let rows = '';
 
     if (currentTab === 'ventas') {
-        headers = '<tr><th>ID</th><th>Serie</th><th>Número</th><th>RUC</th><th>Cliente</th><th>Monto</th><th>Estado</th><th>Acciones</th></tr>';
+        headers = '<tr><th>ID</th><th>Serie</th><th>Numero</th><th>RUC</th><th>Cliente</th><th>Monto</th><th>Estado</th><th>Acciones</th></tr>';
         docs.forEach(d => {
+            const hasError = d.estado_declaracion === 'ERROR' || d.estado_declaracion === 'PENDIENTE';
             rows += `<tr>
                 <td>${d.id_venta || ''}</td>
                 <td>${d.num_serie || ''}</td>
@@ -129,27 +158,33 @@ function renderTable(docs) {
                 <td>${d.ruc || ''}</td>
                 <td>${d.nombres_cliente || ''}</td>
                 <td>S/. ${parseFloat(d.monto_venta || 0).toFixed(2)}</td>
-                <td>${badgeEstado(d.estado_declaracion)}</td>
+                <td>${badgeEstado(d.estado_declaracion, 'ventas', d.id_venta)}</td>
                 <td>
-                    <button class="action-btn" onclick='showPreview(${JSON.stringify(d)})'>Preview</button>
+                    <a href="/documents/ventas/${d.id_venta}" class="action-btn">Detalle</a>
+                    <button class="action-btn" onclick='showPreview(${JSON.stringify(d)})'>JSON</button>
+                    ${hasError ? `<button class="action-btn danger" onclick="resendDoc(${d.id_venta})">Reenviar</button>` : ''}
                 </td>
             </tr>`;
         });
     } else if (currentTab === 'notas_credito') {
-        headers = '<tr><th>ID</th><th>Serie</th><th>Número</th><th>Persona</th><th>Motivo</th><th>Estado</th><th>Acciones</th></tr>';
+        headers = '<tr><th>ID</th><th>Serie</th><th>Numero</th><th>Persona</th><th>Motivo</th><th>Estado</th><th>Acciones</th></tr>';
         docs.forEach(d => {
+            const hasError = d.estado_declaracion === 'ERROR' || d.estado_declaracion === 'PENDIENTE';
             rows += `<tr>
                 <td>${d.id_notas_credito_debito || ''}</td>
                 <td>${d.serie || ''}</td>
                 <td>${d.numero || ''}</td>
                 <td>${d.persona || ''}</td>
                 <td>${(d.motivo || '').substring(0, 40)}</td>
-                <td>${badgeEstado(d.estado_declaracion)}</td>
-                <td><button class="action-btn" onclick='showPreview(${JSON.stringify(d)})'>Preview</button></td>
+                <td>${badgeEstado(d.estado_declaracion, 'notas_credito', d.id_notas_credito_debito)}</td>
+                <td>
+                    <a href="/documents/notas_credito/${d.id_notas_credito_debito}" class="action-btn">Detalle</a>
+                    <button class="action-btn" onclick='showPreview(${JSON.stringify(d)})'>JSON</button>
+                </td>
             </tr>`;
         });
     } else if (currentTab === 'guias') {
-        headers = '<tr><th>ID</th><th>Serie</th><th>Número</th><th>Destinatario</th><th>Motivo</th><th>Estado</th><th>Acciones</th></tr>';
+        headers = '<tr><th>ID</th><th>Serie</th><th>Numero</th><th>Destinatario</th><th>Motivo</th><th>Estado</th><th>Acciones</th></tr>';
         docs.forEach(d => {
             rows += `<tr>
                 <td>${d.id_guia || ''}</td>
@@ -157,12 +192,15 @@ function renderTable(docs) {
                 <td>${d.numero || ''}</td>
                 <td>${d.destinatario || ''}</td>
                 <td>${(d.motivo_anulado || '').substring(0, 40)}</td>
-                <td>${badgeEstado(d.estado_declaracion)}</td>
-                <td><button class="action-btn" onclick='showPreview(${JSON.stringify(d)})'>Preview</button></td>
+                <td>${badgeEstado(d.estado_declaracion, 'guias', d.id_guia)}</td>
+                <td>
+                    <a href="/documents/guias/${d.id_guia}" class="action-btn">Detalle</a>
+                    <button class="action-btn" onclick='showPreview(${JSON.stringify(d)})'>JSON</button>
+                </td>
             </tr>`;
         });
     } else if (currentTab === 'anulados') {
-        headers = '<tr><th>ID</th><th>Serie</th><th>Número</th><th>RUC</th><th>Cliente</th><th>Monto</th><th>Estado</th><th>Estado Anul.</th><th>Acciones</th></tr>';
+        headers = '<tr><th>ID</th><th>Serie</th><th>Numero</th><th>RUC</th><th>Cliente</th><th>Monto</th><th>Estado</th><th>Estado Anul.</th><th>Acciones</th></tr>';
         docs.forEach(d => {
             rows += `<tr>
                 <td>${d.id_venta || ''}</td>
@@ -173,7 +211,7 @@ function renderTable(docs) {
                 <td>S/. ${parseFloat(d.monto_venta || 0).toFixed(2)}</td>
                 <td>${badgeEstado(d.estado_declaracion)}</td>
                 <td>${badgeEstado(d.estado_declaracion_anulado)}</td>
-                <td><button class="action-btn" onclick='showPreview(${JSON.stringify(d)})'>Preview</button></td>
+                <td><button class="action-btn" onclick='showPreview(${JSON.stringify(d)})'>JSON</button></td>
             </tr>`;
         });
     }
@@ -182,7 +220,7 @@ function renderTable(docs) {
     body.innerHTML = rows;
 }
 
-function badgeEstado(estado) {
+function badgeEstado(estado, docType, docId) {
     if (!estado) return '<span class="badge badge-default">N/A</span>';
     const map = {
         'PENDIENTE': 'badge-pendiente',
@@ -192,39 +230,78 @@ function badgeEstado(estado) {
         'NO DECLARAR': 'badge-nodeclarar',
     };
     const cls = map[estado] || 'badge-default';
-    return `<span class="badge ${cls}">${estado}</span>`;
+    return `<span class="badge ${cls}" onclick="editEstado('${docType}', ${docId}, '${estado}')">${estado}</span>`;
+}
+
+function editEstado(docType, docId, currentEstado) {
+    const options = ['PENDIENTE', 'PROCESADO', 'ERROR', 'ANULADO', 'NO DECLARAR'];
+    const newEstado = prompt(`Cambiar estado de ${docType}/${docId}:\n\nEstado actual: ${currentEstado}\n\nOpciones: ${options.join(', ')}`, currentEstado);
+    if (!newEstado || newEstado === currentEstado) return;
+    if (!options.includes(newEstado)) {
+        alert('Estado invalido. Opciones: ' + options.join(', '));
+        return;
+    }
+    fetch(`/api/documents/${docId}/status`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ estado: newEstado })
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            loadDocs();
+        } else {
+            alert('Error: ' + (data.error || 'Desconocido'));
+        }
+    })
+    .catch(e => alert('Error de conexion'));
+}
+
+function resendDoc(docId) {
+    if (!confirm(`Reenviar documento ${docId}?`)) return;
+    fetch(`/api/documents/${docId}/resend`, { method: 'POST' })
+        .then(r => r.json())
+        .then(data => {
+            if (data.success) {
+                alert('Documento reenviado correctamente');
+                loadDocs();
+            } else {
+                alert('Error: ' + (data.error || 'Desconocido'));
+            }
+        })
+        .catch(e => alert('Error de conexion'));
 }
 
 function showPreview(doc) {
-    document.getElementById('previewTitle').textContent = `Preview: ${doc.num_serie || doc.serie || ''}-${doc.num_documento || doc.numero || ''}`;
+    const id = doc.id_venta || doc.id_notas_credito_debito || doc.id_guia || '';
+    const serie = doc.num_serie || doc.serie || '';
+    const numero = doc.num_documento || doc.numero || '';
+    document.getElementById('previewTitle').textContent = `Preview: ${serie}-${numero}`;
 
-    const payload = {};
-    const response = {};
-
-    if (doc.observaciones_declaracion) {
-        try {
-            const parsed = JSON.parse(doc.observaciones_declaracion);
-            Object.assign(response, parsed);
-        } catch(e) {
-            response.raw = doc.observaciones_declaracion;
-        }
-    }
-
-    if (doc.estado_declaracion === 'PENDIENTE' || doc.estado_declaracion === 'NO DECLARAR') {
-        payload.info = 'Documento pendiente de envio. Payload se construira al enviar.';
-        payload.estado = doc.estado_declaracion;
-        payload.serie = doc.num_serie || doc.serie;
-        payload.numero = doc.num_documento || doc.numero;
-    } else {
-        payload.info = 'Documento ya procesado. Ver respuesta recibida.';
-        payload.estado = doc.estado_declaracion;
-    }
-
-    document.getElementById('previewPayload').textContent = JSON.stringify(payload, null, 2);
-    document.getElementById('previewResponse').textContent = JSON.stringify(response, null, 2);
+    document.getElementById('previewPayload').textContent = 'Cargando payload...';
+    document.getElementById('previewResponse').textContent = 'Cargando respuesta...';
 
     document.getElementById('previewModal').style.display = 'flex';
     switchPreviewTab('payload', document.querySelector('#previewModal .tab-btn'));
+
+    const docType = currentTab === 'notas_credito' ? 'notas_credito' : currentTab;
+    fetch(`/api/documents/${docType}/${id}/payload`)
+        .then(r => r.json())
+        .then(data => {
+            if (data.error) {
+                document.getElementById('previewPayload').textContent = 'Error: ' + data.error;
+                document.getElementById('previewResponse').textContent = 'Sin respuesta';
+                return;
+            }
+            const payloadStr = JSON.stringify(data.payload || {}, null, 2);
+            const responseStr = JSON.stringify(data.response || {}, null, 2);
+            document.getElementById('previewPayload').textContent = payloadStr || 'Sin payload';
+            document.getElementById('previewResponse').textContent = responseStr || 'Sin respuesta';
+        })
+        .catch(e => {
+            document.getElementById('previewPayload').textContent = 'Error de conexion';
+            document.getElementById('previewResponse').textContent = 'Error de conexion';
+        });
 }
 
 function switchPreviewTab(tab, btn) {
