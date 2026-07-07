@@ -1,8 +1,9 @@
 import json
 from flask import Flask, render_template, request, redirect, url_for, jsonify
 from base.comercial.db import (
-    check_connection, read_empresa_full, update_empresa,
-    get_connection
+    check_connection, read_empresa_full, update_empresa, get_connection,
+    read_ventas_list, read_notas_credito_list, read_guias_list, read_anulados_list,
+    update_venta_pgsql
 )
 from logger import get_logger
 
@@ -51,6 +52,66 @@ def empresa_save():
     except Exception as e:
         log.error(f'[DASHBOARD] Error guardando empresa: {e}')
         return render_template('empresa.html', empresa=(token, url, '', ''), saved=False, error=str(e))
+
+
+@app.route('/documents')
+def documents_page():
+    tab = request.args.get('tab', 'ventas')
+    estado = request.args.get('estado', None)
+    serie = request.args.get('serie', None)
+    fecha = request.args.get('fecha', None)
+    return render_template(
+        'documents.html',
+        tab=tab,
+        estado=estado,
+        serie=serie,
+        fecha=fecha,
+    )
+
+
+@app.route('/api/documents')
+def api_documents():
+    doc_type = request.args.get('type', 'ventas')
+    estado = request.args.get('estado', None)
+    serie = request.args.get('serie', None)
+    fecha = request.args.get('fecha', None)
+    try:
+        if doc_type == 'ventas':
+            docs = read_ventas_list(estado=estado, serie=serie, fecha=fecha)
+        elif doc_type == 'notas_credito':
+            docs = read_notas_credito_list(estado=estado)
+        elif doc_type == 'guias':
+            docs = read_guias_list(estado=estado)
+        elif doc_type == 'anulados':
+            docs = read_anulados_list()
+        else:
+            docs = []
+        for doc in docs:
+            for k, v in doc.items():
+                if hasattr(v, 'isoformat'):
+                    doc[k] = v.isoformat()
+                elif isinstance(v, (int, float, str, bool, type(None))):
+                    pass
+                else:
+                    doc[k] = str(v)
+        return jsonify({'documents': docs, 'count': len(docs)})
+    except Exception as e:
+        log.error(f'[DASHBOARD] Error listando documentos: {e}')
+        return jsonify({'documents': [], 'count': 0, 'error': str(e)})
+
+
+@app.route('/api/documents/<int:doc_id>/status', methods=['PUT'])
+def api_update_status(doc_id):
+    data = request.get_json()
+    nuevo_estado = data.get('estado')
+    if not nuevo_estado:
+        return jsonify({'error': 'Estado requerido'}), 400
+    try:
+        update_venta_pgsql(nuevo_estado, '', doc_id)
+        return jsonify({'success': True})
+    except Exception as e:
+        log.error(f'[DASHBOARD] Error actualizando estado: {e}')
+        return jsonify({'error': str(e)}), 500
 
 
 @app.route('/api/status')

@@ -32,6 +32,10 @@ def _open_dashboard(icon, item):
     webbrowser.open(f'http://127.0.0.1:{TRAY_PORT}')
 
 
+def _open_documents(icon, item):
+    webbrowser.open(f'http://127.0.0.1:{TRAY_PORT}/documents')
+
+
 def _show_status(icon, item):
     from base.comercial.db import check_connection
     icon.icon = _create_icon('yellow')
@@ -117,6 +121,7 @@ def run_tray():
             pystray.MenuItem('Estado de Conexion', _show_status, default=True),
             pystray.Menu.SEPARATOR,
             pystray.MenuItem('Abrir Dashboard', _open_dashboard),
+            pystray.MenuItem('Ver Documentos', _open_documents),
             pystray.MenuItem('Iniciar Servidor Web', _start_web, visible=_is_web_stopped),
             pystray.MenuItem('Detener Servidor Web', _stop_web, visible=_is_web_running),
             pystray.Menu.SEPARATOR,

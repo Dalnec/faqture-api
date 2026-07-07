@@ -167,3 +167,104 @@ def update_no_200(estado, id):
             )
         cnx.commit()
         log.debug(f'[DB] update_no_200 id={id} estado={estado}')
+
+
+def read_ventas_list(estado=None, serie=None, fecha=None):
+    conditions = ["V.num_serie NOT IN ('PRE')"]
+    params = []
+    if estado:
+        conditions.append("V.estado_declaracion = %s")
+        params.append(estado)
+    if serie:
+        conditions.append("V.num_serie = %s")
+        params.append(serie)
+    if fecha:
+        conditions.append("DATE(V.fecha_hora) = %s")
+        params.append(fecha)
+    where = " AND ".join(conditions)
+    sql = f"""
+        SELECT V.id_venta, V.num_serie, V.num_documento,
+               C.ruc, C.nombres_cliente, V.monto_venta,
+               V.estado_declaracion, V.observaciones_declaracion,
+               V.fecha_hora, V.external_id,
+               TD.codigo_sunat
+        FROM comercial.ventas V
+            LEFT JOIN comercial.cliente C ON C.codigo_cliente = V.codigo_cliente_anulado
+            LEFT JOIN comercial.tipodocumento TD ON TD.id_tipodocumento = V.id_tipodocumento
+        WHERE {where}
+        ORDER BY V.fecha_hora DESC
+        LIMIT 200
+    """
+    with get_connection() as cnx:
+        with cnx.cursor() as cursor:
+            cursor.execute(sql, params)
+            cols = [d[0] for d in cursor.description]
+            return [dict(zip(cols, row)) for row in cursor.fetchall()]
+
+
+def read_notas_credito_list(estado=None):
+    conditions = ["1=1"]
+    params = []
+    if estado:
+        conditions.append("N.estado_declaracion = %s")
+        params.append(estado)
+    where = " AND ".join(conditions)
+    sql = f"""
+        SELECT N.id_notas_credito_debito, N.serie, N.numero,
+               N.estado_declaracion, N.observaciones_declaracion,
+               N.fecha, N.motivo, N.persona,
+               V.num_serie AS serie_ref, V.num_documento AS numero_ref
+        FROM comercial.notas_credito_debito N
+            LEFT JOIN comercial.ventas V ON V.id_venta = N.id_referencia
+        WHERE {where}
+        ORDER BY N.id_notas_credito_debito DESC
+        LIMIT 200
+    """
+    with get_connection() as cnx:
+        with cnx.cursor() as cursor:
+            cursor.execute(sql, params)
+            cols = [d[0] for d in cursor.description]
+            return [dict(zip(cols, row)) for row in cursor.fetchall()]
+
+
+def read_guias_list(estado=None):
+    conditions = ["1=1"]
+    params = []
+    if estado:
+        conditions.append("G.estado_declaracion = %s")
+        params.append(estado)
+    where = " AND ".join(conditions)
+    sql = f"""
+        SELECT G.id_guia, G.serie, G.numero,
+               G.estado_declaracion, G.motivo_anulado,
+               G.fecha_emision, G.destinatario
+        FROM comercial.guia G
+        WHERE {where}
+        ORDER BY G.id_guia DESC
+        LIMIT 200
+    """
+    with get_connection() as cnx:
+        with cnx.cursor() as cursor:
+            cursor.execute(sql, params)
+            cols = [d[0] for d in cursor.description]
+            return [dict(zip(cols, row)) for row in cursor.fetchall()]
+
+
+def read_anulados_list():
+    sql = """
+        SELECT V.id_venta, V.num_serie, V.num_documento,
+               C.ruc, C.nombres_cliente, V.monto_venta,
+               V.estado_declaracion, V.estado_declaracion_anulado,
+               V.observaciones_declaracion, V.fecha_hora
+        FROM comercial.ventas V
+            LEFT JOIN comercial.cliente C ON C.codigo_cliente = V.codigo_cliente_anulado
+        WHERE V.estado_declaracion_anulado IS NOT NULL
+            AND V.estado_declaracion_anulado != ''
+        ORDER BY V.fecha_hora DESC
+        LIMIT 200
+    """
+    with get_connection() as cnx:
+        with cnx.cursor() as cursor:
+            cursor.execute(sql)
+            cols = [d[0] for d in cursor.description]
+            return [dict(zip(cols, row)) for row in cursor.fetchall()]
